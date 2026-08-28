@@ -1,7 +1,7 @@
 # Day 1A Notes
 
 **Date:** August 28, 2026  
-**Repository:** [production-rag-assistant](https://github.com/) (cloned locally)
+**Repository:** production-rag-assistant (cloned locally from GitHub)
 
 ---
 
@@ -32,6 +32,8 @@ I am fine moving slowly. Understanding matters more than having a flashy demo on
 My current mental model (beginner level, subject to change):
 
 **RAG = retrieve relevant text, then generate an answer with that text as context.**
+
+The LLM does not magically know my files. RAG is how I give it the right excerpts when I ask a question.
 
 So the flow is roughly:
 
@@ -68,4 +70,4 @@ What **does** exist:
 - A `.gitignore` (standard Python template from GitHub)
 - This README and Day 1A notes
 
-That is it. This is **not** a RAG system yet. It is the start of a learning project, and that is exactly where I am supposed to be on Day 1A.
+That is it. This is **not** a RAG system yet. It is the start of a learning project that may one day use production-style patterns — and that is exactly where I am supposed to be on Day 1A.

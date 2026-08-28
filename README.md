@@ -1,6 +1,6 @@
 # production-rag-assistant
 
-A learning project for building a production-style RAG assistant — step by step, from an empty repository to something real.
+A **learning project** today that will grow into a **production-style RAG assistant** over time — built step by step, from an empty repository toward something real.
 
 ## Project goal
 
@@ -33,7 +33,9 @@ In plain language:
 
 Think of it as: **look up relevant notes first, then answer using those notes.**
 
-That is the core idea. Everything else — vector databases, chunking strategies, reranking, evals — builds on top of this pattern.
+The language model does not automatically know your private files. RAG is how you **give it the right excerpts** at question time.
+
+That is the core idea for Day 1A. Everything else — vector databases, chunking strategies, reranking, evals — builds on top of this pattern later.
 
 ## What I plan to build later
 
@@ -55,6 +57,7 @@ I will add these pieces gradually. I am not rushing to install every framework o
 | Item | Status |
 |------|--------|
 | GitHub repository | Created and cloned locally |
+| Documentation | README and Day 1A notes only |
 | Application code | **None yet** |
 | Backend / API | Not started |
 | Frontend | Not started |
