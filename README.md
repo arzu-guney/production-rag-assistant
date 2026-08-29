@@ -49,6 +49,10 @@ Nothing below exists in this repository yet. This is a rough roadmap as I learn:
 
 I will add these pieces gradually, one decision at a time.
 
+## Current Learning Focus
+
+Day 1A is about getting the foundation right before any code. The focus is on repository setup, defining the project goal, and building a basic mental model of what RAG does. Application development has not started yet; that begins in later days once this mental model feels clear.
+
 ## Current status
 
 | Item | Status |
