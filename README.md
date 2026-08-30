@@ -51,7 +51,14 @@ I will add these pieces gradually, one decision at a time.
 
 ## Current Learning Focus
 
-Day 1A is about getting the foundation right before any code. The focus is on repository setup, defining the project goal, and building a basic mental model of what RAG does. Application development has not started yet; that begins in later days once this mental model feels clear.
+Day 1A is about preparation, not implementation. The focus is on:
+
+- Setting up the repository
+- Clarifying the project goal
+- Understanding what RAG means at a high level
+- Documenting the learning process before writing application code
+
+No real backend, RAG pipeline, embeddings, vector database, or LLM integration has been implemented yet. This stage is intentionally documentation-only so the mental model is clear before application development begins.
 
 ## Current status
 
