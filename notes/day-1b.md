@@ -1,174 +1,201 @@
-# Day 1B Notes
+# Day 1B — Backend Basics
 
-Day 1B is the first backend step in **production-rag-assistant**.
+This guide explains the first backend step in **production-rag-assistant**.
 
-At this stage, the project has a tiny FastAPI server with one endpoint: `GET /health`. There is no RAG pipeline, no document search, and no AI features yet. This is intentional — we are learning the basics of how a backend works before adding more later.
+At this stage, the project has a small FastAPI server with one endpoint: `GET /health`. There is no RAG pipeline, document search, or AI functionality yet. Day 1B is about learning how a backend receives a request and sends back a response.
 
 ---
 
 ## What is a backend?
 
-The **backend** is the part of an application that runs on a server (or on your laptop during development) and does the work when something asks it to.
+A **backend** is the part of an application that runs on a machine and does work when something asks it to.
 
-In **production-rag-assistant**, the backend lives in `backend/app/main.py`. Right now it does one simple job: answer when something asks, “Are you running?”
+It listens for incoming requests, runs your code, and sends answers back.
 
-Think of it like this:
+In this project, the backend lives in `backend/app/main.py`. Right now it does one simple job: confirm that the server is running.
+
+**Simple analogy:**
 
 - **Backend** = the kitchen (does the work)
-- **Client** = whoever asks for something (your browser, a script, or a future frontend)
+- **Client** = whoever asks for something (your browser, a script, or a tool)
 
-On Day 1B, the backend is very small. That is normal. We are building the foundation first.
+Example in this project: when you open `http://127.0.0.1:8000/health`, your browser is the client, and the FastAPI app in `backend/app/main.py` is the backend.
+
+---
+
+## What is an API?
+
+An **API** (Application Programming Interface) is a defined way for programs to talk to each other.
+
+For a web backend, the API tells callers:
+
+- **what** they can ask for
+- **how** they should ask (HTTP method + URL)
+- **what kind of answer** they will get back (often JSON)
+
+**JSON** is a text format for structured data. It looks like a Python dictionary written as text.
+
+In **production-rag-assistant**, the API is very small. It exposes one operation: check whether the service is alive. Other features may be added later, but they do not exist yet.
 
 ---
 
 ## What is an API endpoint?
 
-An **API endpoint** is one specific address your backend listens on, combined with how you are allowed to call it.
+An **API endpoint** is one specific entry point on a backend.
 
-It is made up of:
+Each endpoint is defined by two parts:
 
 1. **HTTP method** — how you are asking (for example, `GET`)
 2. **Path** — the URL path (for example, `/health`)
 
-In this project, we have exactly one endpoint:
+Together, they identify one "door" on the backend.
+
+In this project, there is exactly one endpoint:
 
 ```
 GET /health
 ```
 
-That means: “Send a `GET` request to `/health`, and the backend will run the matching Python function.”
-
-In `backend/app/main.py`, this line defines the endpoint:
+In code, it is registered here:
 
 ```python
 @app.get("/health")
 ```
 
-Each endpoint is like a labeled door on the backend. Different doors can do different jobs later. For now, we only have one door.
+That line means: "When someone sends a `GET` request to `/health`, run the matching Python function."
 
 ---
 
 ## What is an HTTP GET request?
 
-An **HTTP request** is how a client talks to a backend over the web.
+**HTTP** (Hypertext Transfer Protocol) is the language clients and servers use to communicate on the web.
 
-A **GET** request is a type of HTTP request that means: *“Give me something”* or *“Let me check something.”*
+An **HTTP request** is what the client sends. It includes:
 
-You are not sending complex data to change things. You are mainly **reading** or **checking**.
+- a **method** (such as `GET`)
+- a **path** (such as `/health`)
 
-Examples of GET in this project:
+A **GET** request means: *"Give me something"* or *"Let me check something."*
+
+You are mainly **reading** or **checking**, not sending complex data to change the server.
+
+Examples in this project:
 
 - Opening `http://127.0.0.1:8000/health` in a browser
-- Running a command that asks the server for `/health`
+- Using a tool that asks the server for `/health`
 
-For Day 1B, GET is the right choice for `/health` because we only want to **check** if the service is up — not upload files or submit questions.
+`GET` is the right method for `/health` because we only want to check status, not upload files or submit questions.
 
 ---
 
-## What should GET /health do?
+## What is a health endpoint?
 
-The `/health` endpoint should answer one simple question:
+A **health endpoint** is a simple endpoint that answers one question:
 
-**“Is the backend running and able to respond?”**
+**"Is this service running and able to respond?"**
 
-In **production-rag-assistant**, `GET /health` returns:
+It is often called `/health` and is one of the first endpoints added to a new backend.
+
+In **production-rag-assistant**, the health endpoint confirms that:
+
+- the server process started
+- FastAPI is receiving requests
+- the backend can return a response
+
+It does **not** check RAG, documents, or AI features — because those are not part of the project yet. It only checks basic backend plumbing.
+
+---
+
+## What does GET /health mean?
+
+`GET /health` is shorthand for an HTTP request with:
+
+- **Method:** `GET`
+- **Path:** `/health`
+
+Read it as: *"Using GET, ask the `/health` endpoint for a status check."*
+
+In this project, `GET /health` returns JSON like:
 
 ```json
-{"status": "ok"}
+{"status": "ok", "service": "production-rag-assistant"}
 ```
 
-That response means:
+What each field means:
 
-- The server process started successfully
-- FastAPI received the request
-- The backend handled the request and sent a reply
+- `"status": "ok"` — the backend is responding
+- `"service": "production-rag-assistant"` — which service answered
 
-`/health` does **not** check RAG features, documents, or AI logic — because those do not exist in the project yet. It only checks that the basic backend plumbing works.
-
-This is a common first endpoint in real projects too. Before building bigger features, you want proof that the server is alive.
+That is the entire API surface of the project at this early stage.
 
 ---
 
-## What happens when I call GET /health?
+## What happens when GET /health is called?
 
-Here is the step-by-step flow for this project:
+Here is the full flow, step by step:
 
-### 1. Request
+### 1. Client
 
-You send:
+You (or your browser) send a request to the running server.
+
+Example: visit `http://127.0.0.1:8000/health`
+
+### 2. GET /health
+
+The request arrives as:
 
 ```
 GET /health
 ```
 
-For example, by visiting `http://127.0.0.1:8000/health`.
+### 3. FastAPI route
 
-### 2. FastAPI route
-
-FastAPI receives the request and looks for a matching route:
-
-- Method: `GET`
-- Path: `/health`
-
-It finds the route registered by:
+FastAPI looks at the method (`GET`) and path (`/health`), then finds the matching route:
 
 ```python
 @app.get("/health")
 ```
 
-### 3. Python function
+### 4. Python function
 
-FastAPI calls this function:
+FastAPI calls the `health()` function:
 
 ```python
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "production-rag-assistant"}
 ```
 
-### 4. Return value
+### 5. Python dictionary
 
-The function returns a Python dictionary:
+The function returns a Python **dictionary** — a collection of key-value pairs:
 
 ```python
-{"status": "ok"}
+{"status": "ok", "service": "production-rag-assistant"}
 ```
 
-FastAPI converts it to JSON for the HTTP response body.
+### 6. JSON HTTP response
 
-### 5. HTTP response
+FastAPI converts that dictionary to **JSON** and sends it back as the HTTP response body, with status code `200` (success).
 
-You receive a response like:
+You see:
 
-- **Status code:** `200` (success)
-- **Body:** `{"status": "ok"}`
+```json
+{"status": "ok", "service": "production-rag-assistant"}
+```
 
 ### Full sequence
 
 ```text
-GET /health
-  → request arrives at the server
-  → FastAPI matches the route @app.get("/health")
-  → Python function health() runs
-  → return value {"status": "ok"}
-  → HTTP response sent back to you
+client
+  → GET /health
+  → FastAPI route
+  → Python function
+  → Python dictionary
+  → JSON HTTP response
 ```
 
----
+### Key takeaway
 
-## Where this project stands
+An API endpoint connects an **HTTP request** to **Python code**. You call `GET /health`, Python runs `health()`, and the return value becomes the response the client receives.
 
-**production-rag-assistant** is still at the very beginning.
-
-What exists after Day 1B:
-
-- A minimal FastAPI backend
-- One health-check endpoint
-
-What does **not** exist yet:
-
-- RAG
-- Document upload
-- Search over documents
-- Any AI or LLM integration
-
-Day 1B is about understanding how a backend receives a request and sends back a response. That mental model will matter when we add real features later.
+That pattern — request in, Python logic, response out — is the foundation every later feature in this project will build on.
