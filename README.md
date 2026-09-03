@@ -60,6 +60,12 @@ Day 1A is about preparation, not implementation. The focus is on:
 
 No real backend, RAG pipeline, embeddings, vector database, or LLM integration has been implemented yet. This stage is intentionally documentation-only so the mental model is clear before application development begins.
 
+## Local Development
+
+You can run the current FastAPI backend on your own computer. The backend only exposes a minimal `GET /health` endpoint so far.
+
+For setup steps, see [`docs/local-development.md`](docs/local-development.md).
+
 ## Current status
 
 | Item | Status |
