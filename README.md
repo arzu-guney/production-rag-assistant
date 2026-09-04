@@ -66,6 +66,12 @@ You can run the current FastAPI backend on your own computer. The backend only e
 
 For setup steps, see [`docs/local-development.md`](docs/local-development.md).
 
+## Backend Dependencies
+
+The packages needed to run the backend are documented in [`docs/backend-dependencies.md`](docs/backend-dependencies.md).
+
+The current backend is intentionally minimal and only supports `GET /health`. RAG, embeddings, a vector database, document upload, and LLM integration have not been implemented yet.
+
 ## Current status
 
 | Item | Status |
