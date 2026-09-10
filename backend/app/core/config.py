@@ -4,17 +4,18 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator
 
-# backend/ is the working directory when running: python -m app.ingestion.indexer
+# backend/ is the working directory when running the API or indexer
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+# Load local .env once (never commit real secrets)
+load_dotenv(BACKEND_ROOT / ".env")
 
 
 class Settings(BaseModel):
-    """Typed settings for the local RAG indexing pipeline.
-
-    Override fields with environment variables (see get_settings).
-    """
+    """Typed settings for indexing and RAG question answering."""
 
     embedding_model_name: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
@@ -43,6 +44,21 @@ class Settings(BaseModel):
         default=BACKEND_ROOT / "data" / "documents",
         description="Default directory for source documents.",
     )
+    retrieval_top_k: int = Field(
+        default=4,
+        ge=1,
+        le=20,
+        description="Number of nearest chunks to retrieve for each question.",
+    )
+    gemini_api_key: str = Field(
+        default="",
+        description="Google Gemini API key (from GEMINI_API_KEY).",
+    )
+    gemini_model: str = Field(
+        default="gemini-2.0-flash",
+        min_length=1,
+        description="Gemini model id for grounded answer generation.",
+    )
 
     @model_validator(mode="after")
     def overlap_must_be_less_than_size(self) -> Settings:
@@ -62,6 +78,7 @@ def get_settings() -> Settings:
     chunk_overlap = _env("CHUNK_OVERLAP")
     vector_db_path = _env("VECTOR_DB_PATH")
     documents_path = _env("DOCUMENTS_PATH")
+    top_k = _env("RETRIEVAL_TOP_K")
 
     return Settings(
         embedding_model_name=_env(
@@ -78,4 +95,7 @@ def get_settings() -> Settings:
         documents_path=Path(documents_path)
         if documents_path
         else BACKEND_ROOT / "data" / "documents",
+        retrieval_top_k=int(top_k) if top_k else 4,
+        gemini_api_key=_env("GEMINI_API_KEY", "") or "",
+        gemini_model=_env("GEMINI_MODEL", "gemini-2.0-flash") or "gemini-2.0-flash",
     )

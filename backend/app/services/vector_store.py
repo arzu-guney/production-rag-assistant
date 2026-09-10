@@ -43,6 +43,25 @@ class VectorStore:
     def count(self) -> int:
         return int(self._collection.count())
 
+    def query(
+        self,
+        *,
+        query_embedding: list[float],
+        top_k: int,
+    ) -> dict[str, list]:
+        """Return nearest chunks for a query embedding.
+
+        Chroma is configured with cosine space. Returned ``distances`` are
+        cosine distances (lower is closer), not similarity scores.
+        """
+        if top_k < 1:
+            raise ValueError("top_k must be >= 1")
+        return self._collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+
     def upsert_chunks(
         self,
         *,

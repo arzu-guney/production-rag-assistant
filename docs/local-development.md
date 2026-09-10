@@ -1,241 +1,138 @@
 # Local Development Guide
 
-This guide explains how to run the current FastAPI backend in **production-rag-assistant** on your own computer. It is written for beginners using **Windows Command Prompt**.
+This guide explains how to run the **production-oriented** RAG backend in **production-rag-assistant** on Windows (Command Prompt or PowerShell).
+
+Supported runtime: **Python 3.11**.
 
 ---
 
-## Current project status
+## What works today
 
-This project currently has a **minimal FastAPI backend** with one endpoint:
+- Index local documents into ChromaDB
+- Ask questions with `POST /ask` (retrieve → Gemini → citations)
+- `GET /health` liveness check
 
-```text
-GET /health
-```
-
-That endpoint returns a simple JSON response so you can confirm the server is running.
-
-The following have **not** been implemented yet:
-
-- RAG
-- Document upload
-- Embeddings
-- Vector database
-- LLM integration
-
-You are only setting up and testing the small health-check backend.
+This is not a production-ready deployment guide. It is local development only.
 
 ---
 
 ## Prerequisites
 
-Before you start, make sure you have:
+- **Python 3.11**
+- **Git**
+- Repository cloned locally
+- A **Gemini API key** for `/ask`
 
-- **Python 3.11** installed (recommended and supported for local Windows development)
-- **Git** installed
-- This **repository cloned locally** on your computer
-
-This project is standardised on **Python 3.11** so dependency installs (including ChromaDB) can use prebuilt Windows wheels. Python 3.12+ may fail on Windows when `chroma-hnswlib` has no matching wheel and pip tries to compile from source.
-
-Confirm your version before creating the virtual environment:
+Python 3.12+ on Windows may fail installing `chroma-hnswlib` without a C++ compiler. Use 3.11 instead. Visual C++ Build Tools are **not** a project prerequisite.
 
 ```text
 python --version
 ```
 
-You should see a `3.11.x` version. This guide assumes you already have Python 3.11 and Git ready. It does not cover installing them, and it does **not** require Microsoft Visual C++ Build Tools.
+Expect `3.11.x`.
 
 ---
 
-## Step 1: Open the project folder
+## Setup steps
 
-Open **Command Prompt**, then move into your local copy of the repository.
+### 1. Open the backend folder
 
-Use your real path instead of the placeholder:
-
-```text
-cd path\to\production-rag-assistant
+```powershell
+cd path\to\production-rag-assistant\backend
 ```
 
-Example shape of a path:
+### 2. Create and activate a virtual environment
 
-```text
-cd C:\Users\YourName\production-rag-assistant
-```
-
----
-
-## Step 2: Go to the backend folder
-
-The FastAPI app and its dependency list live inside `backend`:
-
-```text
-cd backend
-```
-
-Your current folder should now be something like:
-
-```text
-...\production-rag-assistant\backend
-```
-
----
-
-## Step 3: Create a virtual environment
-
-A virtual environment keeps this project’s Python packages separate from other projects.
-
-From the `backend` folder, create the environment with **Python 3.11**:
-
-```text
-python -m venv .venv
-```
-
-If `python` points to a different version, prefer:
-
-```text
+```powershell
 py -3.11 -m venv .venv
-```
-
-This creates a folder named `.venv` inside `backend`.
-
----
-
-## Step 4: Activate the virtual environment
-
-Still in the `backend` folder, activate it with this **Windows Command Prompt** command:
-
-```text
 .venv\Scripts\activate
 ```
 
-After activation, your prompt often shows `(.venv)` at the start. That means the virtual environment is active.
+### 3. Install dependencies
 
----
-
-## Step 5: Install dependencies
-
-Install the packages listed in `requirements.txt`:
-
-```text
+```powershell
 pip install -r requirements.txt
 ```
 
-For this project, that installs the packages needed to run the minimal FastAPI app (including FastAPI and Uvicorn).
+### 4. Configure environment variables
 
----
+```powershell
+copy .env.example .env
+```
 
-## Step 6: Run the FastAPI app
-
-Start the local server:
+Edit `.env` and set:
 
 ```text
+GEMINI_API_KEY=your_real_key_here
+```
+
+Optional:
+
+```text
+GEMINI_MODEL=gemini-2.0-flash
+RETRIEVAL_TOP_K=4
+```
+
+Never commit `.env`.
+
+### 5. Index the sample document
+
+```powershell
+python -m app.ingestion.indexer --path data/documents
+```
+
+Expected: only `sample-rag-overview.md` is loaded (about 5 chunks). Re-running should keep collection size stable.
+
+### 6. Run the API
+
+```powershell
 uvicorn app.main:app --reload
 ```
 
-What this means:
+### 7. Call the endpoints
 
-- `app.main` — the file `app\main.py`
-- `:app` — the FastAPI object named `app` in that file
-- `--reload` — restart automatically when you change code
+Health:
 
-Leave this Command Prompt window open while the server is running. You should see output that Uvicorn is listening, usually on port `8000`.
-
----
-
-## Step 7: Test the health endpoint
-
-Open a browser and visit:
-
-```text
-http://127.0.0.1:8000/health
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
 ```
 
-Or keep the server running and use another Command Prompt window if you prefer another tool — the important part is that the request goes to that URL.
+Ask:
 
-The expected response should look like:
-
-```json
-{
-  "status": "ok",
-  "service": "production-rag-assistant"
-}
+```powershell
+Invoke-RestMethod `
+  -Uri http://127.0.0.1:8000/ask `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"question":"What is retrieval-augmented generation?"}'
 ```
 
-If you see that, your local backend is running and the health endpoint is working.
+Interactive docs: `http://127.0.0.1:8000/docs`
+
+Asking a question does **not** re-index documents. It reuses `data/vector_store`.
 
 ---
 
 ## Troubleshooting
 
-### Command not recognized
+### Wrong Python / Chroma install fails
 
-If you see a message that `python`, `pip`, or `uvicorn` is not recognized:
+Recreate the venv with Python 3.11:
 
-- Confirm **Python 3.11** is installed and available in Command Prompt (`python --version`)
-- Make sure the virtual environment is **activated** before using `pip` or `uvicorn`
-- Close and reopen Command Prompt, then activate `.venv` again and retry
-
-### Wrong Python version / Chroma install fails on Windows
-
-If `pip install -r requirements.txt` fails while building `chroma-hnswlib` (or asks for Microsoft Visual C++ Build Tools):
-
-- You are likely on Python 3.12+ without a compatible prebuilt Windows wheel
-- Recreate the virtual environment with **Python 3.11**
-- Example if multiple Pythons are installed:
-
-```text
+```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Do **not** treat Visual C++ Build Tools as a project prerequisite. Use Python 3.11 instead.
+### Missing Gemini key
 
-### Wrong folder
+`/ask` should return HTTP 503 with a clear message if `GEMINI_API_KEY` is missing.
 
-Many commands fail if you are not in the right directory.
+### Empty knowledge base
 
-Check that you are in the `backend` folder when you:
-
-- create the virtual environment
-- activate `.venv`
-- run `pip install -r requirements.txt`
-- run `uvicorn app.main:app --reload`
-
-You can print the current folder with:
-
-```text
-cd
-```
-
-### Server not running
-
-If the browser cannot open `/health`:
-
-- Confirm Uvicorn is still running in Command Prompt
-- Confirm you did not close the window that started the server
-- Confirm the URL is exactly `http://127.0.0.1:8000/health`
-
-The health endpoint only works while the local server is running.
+If you never indexed (or deleted `data/vector_store`), `/ask` should return HTTP 400 telling you to index documents first.
 
 ### Port already in use
 
-If Uvicorn says port `8000` is already in use:
-
-- Another program (or an earlier Uvicorn process) may already be using port `8000`
-- Stop the other process, or close the old Command Prompt window that started the server
-- Then run `uvicorn app.main:app --reload` again
-
----
-
-## Quick checklist
-
-1. Open the project folder
-2. `cd backend`
-3. `python -m venv .venv`
-4. `.venv\Scripts\activate`
-5. `pip install -r requirements.txt`
-6. `uvicorn app.main:app --reload`
-7. Visit `http://127.0.0.1:8000/health`
-
-That is enough to run the current backend locally. No RAG or AI features are included at this stage — only a working health check.
+Stop the other process using port 8000, or restart Uvicorn in a fresh terminal.

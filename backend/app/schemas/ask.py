@@ -5,7 +5,7 @@ QUESTION_MAX_LENGTH = 2000
 
 
 class AskRequest(BaseModel):
-    """Incoming question for the future RAG pipeline."""
+    """Incoming question for the RAG pipeline."""
 
     question: str = Field(
         ...,
@@ -24,11 +24,22 @@ class AskRequest(BaseModel):
         return stripped
 
 
+class SourceCitation(BaseModel):
+    """Deterministic citation built from retrieved chunk metadata."""
+
+    source: str = Field(..., description="Source filename of the retrieved chunk.")
+    page: int | None = Field(
+        default=None,
+        description="PDF page number when available; null for txt/md.",
+    )
+    chunk_id: str = Field(..., description="Stable chunk identifier from the index.")
+
+
 class AskResponse(BaseModel):
-    """Answer contract for /ask. Sources will be filled when retrieval exists."""
+    """Grounded answer plus retrieval-based source citations."""
 
     answer: str = Field(..., description="Generated answer text.")
-    sources: list[str] = Field(
+    sources: list[SourceCitation] = Field(
         default_factory=list,
-        description="Document sources used for the answer. Empty until retrieval is implemented.",
+        description="Citations derived from retrieved chunks (not invented by the LLM).",
     )

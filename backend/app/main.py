@@ -5,8 +5,11 @@ from app.schemas.health import HealthResponse
 
 app = FastAPI(
     title="production-rag-assistant",
-    description="Learning project backend. RAG is not implemented yet.",
-    version="0.1.0",
+    description=(
+        "Production-oriented RAG learning project. "
+        "Indexes local documents and answers questions with Gemini grounding."
+    ),
+    version="0.2.0",
 )
 
 app.include_router(ask_router)
