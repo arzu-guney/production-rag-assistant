@@ -39,10 +39,9 @@ Metadata is especially useful later for citations, for example:
 The FastAPI backend currently exposes:
 
 - GET /health for liveness checks
-- POST /ask as a typed API contract
+- POST /ask for grounded question answering
 
-In the current project stage, /ask still returns a placeholder response.
-Retrieval and LLM answer generation are planned for later commits.
+POST /ask retrieves relevant indexed chunks, sends them to Gemini as context, and returns an answer with source citations derived from retrieval metadata.
 
 ## Safety note
 

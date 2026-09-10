@@ -9,9 +9,12 @@ from pydantic import BaseModel, Field, model_validator
 
 # backend/ is the working directory when running the API or indexer
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = BACKEND_ROOT / ".env"
 
-# Load local .env once (never commit real secrets)
-load_dotenv(BACKEND_ROOT / ".env")
+# Load backend/.env from an absolute path (not the shell working directory).
+# override=False keeps already-exported process env vars if present.
+if ENV_FILE.is_file():
+    load_dotenv(ENV_FILE, override=False)
 
 
 class Settings(BaseModel):
@@ -55,7 +58,7 @@ class Settings(BaseModel):
         description="Google Gemini API key (from GEMINI_API_KEY).",
     )
     gemini_model: str = Field(
-        default="gemini-2.0-flash",
+        default="gemini-3.6-flash",
         min_length=1,
         description="Gemini model id for grounded answer generation.",
     )
@@ -96,6 +99,6 @@ def get_settings() -> Settings:
         if documents_path
         else BACKEND_ROOT / "data" / "documents",
         retrieval_top_k=int(top_k) if top_k else 4,
-        gemini_api_key=_env("GEMINI_API_KEY", "") or "",
-        gemini_model=_env("GEMINI_MODEL", "gemini-2.0-flash") or "gemini-2.0-flash",
+        gemini_api_key=(_env("GEMINI_API_KEY", "") or "").strip(),
+        gemini_model=(_env("GEMINI_MODEL", "gemini-3.6-flash") or "gemini-3.6-flash").strip(),
     )
