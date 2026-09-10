@@ -10,12 +10,13 @@ Packages are listed in:
 backend/requirements.txt
 ```
 
-Install from the `backend/` directory:
+Install from the `backend/` directory (use **Python 3.11** on Windows):
 
 ```text
 pip install -r requirements.txt
 ```
 
+On Windows, prefer Python 3.11 so ChromaDB dependencies (notably `chroma-hnswlib`) can install from prebuilt wheels. Python 3.12+ may trigger a source build that needs a C++ compiler — that is not a project requirement.
 ## Package groups
 
 ### API foundation

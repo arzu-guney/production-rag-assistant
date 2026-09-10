@@ -30,11 +30,19 @@ You are only setting up and testing the small health-check backend.
 
 Before you start, make sure you have:
 
-- **Python** installed
+- **Python 3.11** installed (recommended and supported for local Windows development)
 - **Git** installed
 - This **repository cloned locally** on your computer
 
-This guide assumes you already have those ready. It does not cover installing them.
+This project is standardised on **Python 3.11** so dependency installs (including ChromaDB) can use prebuilt Windows wheels. Python 3.12+ may fail on Windows when `chroma-hnswlib` has no matching wheel and pip tries to compile from source.
+
+Confirm your version before creating the virtual environment:
+
+```text
+python --version
+```
+
+You should see a `3.11.x` version. This guide assumes you already have Python 3.11 and Git ready. It does not cover installing them, and it does **not** require Microsoft Visual C++ Build Tools.
 
 ---
 
@@ -76,10 +84,16 @@ Your current folder should now be something like:
 
 A virtual environment keeps this project’s Python packages separate from other projects.
 
-From the `backend` folder, run:
+From the `backend` folder, create the environment with **Python 3.11**:
 
 ```text
 python -m venv .venv
+```
+
+If `python` points to a different version, prefer:
+
+```text
+py -3.11 -m venv .venv
 ```
 
 This creates a folder named `.venv` inside `backend`.
@@ -157,9 +171,25 @@ If you see that, your local backend is running and the health endpoint is workin
 
 If you see a message that `python`, `pip`, or `uvicorn` is not recognized:
 
-- Confirm Python is installed and available in Command Prompt
+- Confirm **Python 3.11** is installed and available in Command Prompt (`python --version`)
 - Make sure the virtual environment is **activated** before using `pip` or `uvicorn`
 - Close and reopen Command Prompt, then activate `.venv` again and retry
+
+### Wrong Python version / Chroma install fails on Windows
+
+If `pip install -r requirements.txt` fails while building `chroma-hnswlib` (or asks for Microsoft Visual C++ Build Tools):
+
+- You are likely on Python 3.12+ without a compatible prebuilt Windows wheel
+- Recreate the virtual environment with **Python 3.11**
+- Example if multiple Pythons are installed:
+
+```text
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Do **not** treat Visual C++ Build Tools as a project prerequisite. Use Python 3.11 instead.
 
 ### Wrong folder
 

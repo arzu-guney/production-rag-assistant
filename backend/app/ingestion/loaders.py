@@ -7,6 +7,9 @@ from pypdf import PdfReader
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf"}
 
+# Repository guidance files that must not enter the knowledge index.
+EXCLUDED_FILENAMES = {"readme.md"}
+
 
 @dataclass(frozen=True)
 class LoadedDocument:
@@ -37,6 +40,9 @@ def discover_files(directory: Path) -> tuple[list[Path], list[Path]]:
     unsupported: list[Path] = []
     for path in sorted(directory.iterdir()):
         if not path.is_file():
+            continue
+        # Keep repository docs out of the knowledge base (e.g. README.md).
+        if path.name.lower() in EXCLUDED_FILENAMES:
             continue
         if path.suffix.lower() in SUPPORTED_EXTENSIONS:
             supported.append(path)

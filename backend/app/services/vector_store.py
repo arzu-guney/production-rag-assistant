@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.config import Settings
 
 
 def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, str | int | float | bool]:
@@ -26,7 +27,13 @@ class VectorStore:
         self.persist_path = Path(persist_path)
         self.collection_name = collection_name
         self.persist_path.mkdir(parents=True, exist_ok=True)
-        self._client = chromadb.PersistentClient(path=str(self.persist_path))
+        # Disable anonymized telemetry via supported Chroma settings.
+        # Avoids noisy ClientStartEvent / ClientCreateCollectionEvent warnings
+        # from a telemetry client mismatch while leaving real errors visible.
+        self._client = chromadb.PersistentClient(
+            path=str(self.persist_path),
+            settings=Settings(anonymized_telemetry=False),
+        )
         self._collection = self._client.get_or_create_collection(
             name=self.collection_name,
             metadata={"hnsw:space": "cosine"},

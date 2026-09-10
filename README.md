@@ -141,6 +141,10 @@ Additional later topics may include security experiments. Retrieval and generati
 
 ## Local Development
 
+**Supported local runtime: Python 3.11** (especially on Windows).
+
+This project uses ChromaDB for local vector storage. On Windows, Python 3.12+ may fail during `pip install` when `chroma-hnswlib` has no compatible prebuilt wheel. Use Python 3.11 so installs stay reproducible without a C++ compiler.
+
 You can run the current FastAPI backend on your own computer. The backend currently exposes `GET /health` and a typed `POST /ask` placeholder contract.
 
 To build the local vector index from sample documents, see the indexing command in **Currently implemented**.
