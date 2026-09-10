@@ -1,24 +1,25 @@
 # production-rag-assistant
 
-A step-by-step learning project in **Applied AI Engineering**. The aim is to grow this into a production-style RAG assistant over time — understanding every decision along the way, not rushing through a tutorial.
+A step-by-step **Applied AI Engineering** project. This repository is being developed into a **production-oriented RAG application** and a **public learning resource**.
+
+It is built slowly and deliberately: each step should be understandable before the next layer is added.
+
+This is **not** a finished production system today. The long-term goal is a production-oriented RAG assistant with evaluation, observability, and solid engineering habits.
 
 ## Project goal
 
-Learn how Retrieval-Augmented Generation (RAG) works by building a small assistant that can answer questions using my own documents.
+Learn how Retrieval-Augmented Generation (RAG) works by building a small assistant that can answer questions using my own documents — with room later for tests, evaluation, Docker, and CI/CD.
 
-I want to move slowly enough to understand **why** each piece exists — ingestion, retrieval, generation, and later things like evaluation and observability — before adding the next layer.
-
-This is a **learning project first**. The name refers to patterns I hope to practice later; it does **not** mean this repo is production-ready today.
+The name refers to patterns I want to practise over time. It does **not** mean the repository is production-ready yet.
 
 ## Why I am building this project
 
-I am learning Applied AI Engineering and want a dedicated place to practice RAG from the ground up.
+I want a dedicated place to practise Applied AI Engineering from the ground up:
 
-I opened this repository so I can:
-
-- Take notes next to the code as I learn
-- Commit small, understandable steps
+- Commit small, reviewable steps
+- Keep learning notes next to the code
 - Build something real over time instead of only running one-off demos
+- Keep a clear line between what is implemented and what is still planned
 
 ## A very simple explanation of RAG
 
@@ -35,30 +36,74 @@ Simple analogy: **look up relevant notes first, then answer using those notes.**
 
 A language model does not automatically know your private files. RAG is how you give it the right excerpts at question time.
 
-## What I plan to build later
+**Important:** the explanation above describes the target design. RAG is **not implemented in this repository yet**.
 
-Nothing below exists in this repository yet. This is a rough roadmap as I learn:
+## Currently implemented
 
-- Document ingestion and chunking
-- Embeddings and a vector store for search
-- A retrieval step that fetches context for a question
-- An LLM step that answers using that context
-- A simple way to ask questions (API or UI)
-- Basic evaluation and observability
-- Security and safety experiments
+What exists in the codebase today:
 
-I will add these pieces gradually, one decision at a time.
+- A FastAPI backend foundation under `backend/`
+- One endpoint: `GET /health`
+- Local development documentation
+- Backend dependency documentation
+- Beginner-friendly learning notes for Day 1 topics
 
-## Current Learning Focus
+Canonical backend entry point:
 
-Day 1A is about preparation, not implementation. The focus is on:
+```text
+backend/app/main.py
+```
 
-- Setting up the repository
-- Clarifying the project goal
-- Understanding what RAG means at a high level
-- Documenting the learning process before writing application code
+Canonical dependency file:
 
-No real backend, RAG pipeline, embeddings, vector database, or LLM integration has been implemented yet. This stage is intentionally documentation-only so the mental model is clear before application development begins.
+```text
+backend/requirements.txt
+```
+
+`GET /health` returns a response similar to:
+
+```json
+{
+  "status": "ok",
+  "service": "production-rag-assistant"
+}
+```
+
+This health check confirms that the backend process starts and can respond to HTTP requests. It does **not** mean RAG is working.
+
+## Planned
+
+The following are **planned next** and are **not implemented yet**:
+
+- Typed Q&A API
+- Document ingestion
+- Chunking
+- Embeddings
+- Vector indexing
+- Retrieval
+- LLM answer generation
+- Source citations
+- Tests
+- Evaluation
+- Docker
+- CI/CD
+
+Additional later topics may include observability and security experiments. None of those exist in the application code today.
+
+## Current status
+
+| Item | Status |
+|------|--------|
+| GitHub repository | Active |
+| FastAPI backend foundation | Implemented (`backend/app/main.py`) |
+| `GET /health` | Implemented |
+| Local development docs | Implemented (`docs/local-development.md`) |
+| Backend dependency docs | Implemented (`docs/backend-dependencies.md`) |
+| Learning notes | In progress (`notes/`) |
+| Working RAG application | **Not implemented** |
+| Document ingestion / embeddings / vector DB | **Not implemented** |
+| LLM integration / Q&A API | **Not implemented** |
+| Tests / evaluation / Docker / CI/CD | **Not implemented** |
 
 ## Local Development
 
@@ -70,17 +115,20 @@ For setup steps, see [`docs/local-development.md`](docs/local-development.md).
 
 The packages needed to run the backend are documented in [`docs/backend-dependencies.md`](docs/backend-dependencies.md).
 
-The current backend is intentionally minimal and only supports `GET /health`. RAG, embeddings, a vector database, document upload, and LLM integration have not been implemented yet.
+Dependencies currently support the FastAPI health endpoint only.
 
-## Current status
+## Learning notes
 
-| Item | Status |
-|------|--------|
-| GitHub repository | Created and cloned locally |
-| Documentation | README and Day 1A notes |
-| Application code | **None** |
-| Working RAG application | **Does not exist yet** |
+Day-by-day notes are kept as a public learning resource:
 
-**There is no working RAG application in this repository yet.** Day 1A is repository setup, a clear README, and personal notes only.
+- [`notes/day-1a.md`](notes/day-1a.md)
+- [`notes/day-1b.md`](notes/day-1b.md)
+- [`notes/day-1c.md`](notes/day-1c.md)
+- [`notes/day-1e.md`](notes/day-1e.md)
+- [`notes/day-1f.md`](notes/day-1f.md)
+- [`notes/day-1g.md`](notes/day-1g.md)
+- [`notes/day-1h.md`](notes/day-1h.md)
+- [`notes/day-1i.md`](notes/day-1i.md)
+- [`notes/day-1k.md`](notes/day-1k.md)
 
-See [`notes/day-1a.md`](notes/day-1a.md) for Day 1A reflections.
+These notes explain early backend concepts. They do not imply that RAG features have been built.
