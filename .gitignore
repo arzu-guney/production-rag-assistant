@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local RAG artifacts (never commit embeddings / vector DB files)
+backend/data/vector_store/
+**/chroma/
+*.chroma

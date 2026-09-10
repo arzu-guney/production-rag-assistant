@@ -36,17 +36,22 @@ Simple analogy: **look up relevant notes first, then answer using those notes.**
 
 A language model does not automatically know your private files. RAG is how you give it the right excerpts at question time.
 
-**Important:** the explanation above describes the target design. RAG is **not implemented in this repository yet**.
+**Important:** RAG **indexing** (load → chunk → embed → store) is implemented locally. Semantic retrieval and LLM answer generation for `/ask` are **not** implemented yet.
 
 ## Currently implemented
 
 What exists in the codebase today:
 
 - A FastAPI backend foundation under `backend/`
-- One endpoint: `GET /health`
-- Local development documentation
-- Backend dependency documentation
-- Beginner-friendly learning notes for Day 1 topics
+- `GET /health` liveness endpoint
+- Typed `POST /ask` API contract with Pydantic request/response models (still a **placeholder** answer)
+- Document loading for `.txt`, `.md`, and `.pdf`
+- Text extraction (including PDF page-level extraction when text is available)
+- Configurable character chunking with overlap
+- Local embedding generation via Sentence Transformers (no external API key required)
+- Persistent vector indexing with ChromaDB
+- Metadata preservation (source path/name, document type, page number, chunk index)
+- Local development documentation and learning notes
 
 Canonical backend entry point:
 
@@ -60,7 +65,9 @@ Canonical dependency file:
 backend/requirements.txt
 ```
 
-`GET /health` returns a response similar to:
+### API endpoints
+
+`GET /health` returns:
 
 ```json
 {
@@ -69,53 +76,82 @@ backend/requirements.txt
 }
 ```
 
-This health check confirms that the backend process starts and can respond to HTTP requests. It does **not** mean RAG is working.
+`POST /ask` accepts a typed question body but currently returns an honest **placeholder** response. It does **not** retrieve from the vector store or call an LLM yet.
+
+### Local document indexing
+
+Index sample documents (from the `backend/` directory):
+
+```text
+python -m app.ingestion.indexer --path data/documents
+```
+
+This runs:
+
+`documents → text extraction → chunking → embeddings → ChromaDB persistence`
+
+Default settings (overridable by environment variables):
+
+| Setting | Default | Env var |
+|---------|---------|---------|
+| Embedding model | `sentence-transformers/all-MiniLM-L6-v2` | `EMBEDDING_MODEL_NAME` |
+| Chunk size | `500` characters | `CHUNK_SIZE` |
+| Chunk overlap | `100` characters | `CHUNK_OVERLAP` |
+| Vector DB path | `backend/data/vector_store` | `VECTOR_DB_PATH` |
+| Collection name | `documents` | `COLLECTION_NAME` |
+
+The persisted vector database under `backend/data/vector_store/` is **gitignored** and must not be committed.
+
+Sample document: `backend/data/documents/sample-rag-overview.md`
 
 ## Planned
 
 The following are **planned next** and are **not implemented yet**:
 
-- Typed Q&A API
-- Document ingestion
-- Chunking
-- Embeddings
-- Vector indexing
-- Retrieval
+- Semantic retrieval for `/ask`
+- Context construction
 - LLM answer generation
-- Source citations
-- Tests
+- Source citations from retrieved chunks
 - Evaluation
+- Observability
 - Docker
 - CI/CD
+- Tests
 
-Additional later topics may include observability and security experiments. None of those exist in the application code today.
+Additional later topics may include security experiments. Retrieval and generation are the next major steps.
 
 ## Current status
 
 | Item | Status |
 |------|--------|
 | GitHub repository | Active |
-| FastAPI backend foundation | Implemented (`backend/app/main.py`) |
+| FastAPI backend foundation | Implemented |
 | `GET /health` | Implemented |
-| Local development docs | Implemented (`docs/local-development.md`) |
-| Backend dependency docs | Implemented (`docs/backend-dependencies.md`) |
-| Learning notes | In progress (`notes/`) |
-| Working RAG application | **Not implemented** |
-| Document ingestion / embeddings / vector DB | **Not implemented** |
-| LLM integration / Q&A API | **Not implemented** |
+| Typed `POST /ask` API contract | Implemented (**placeholder** response) |
+| Document loading (txt/md/pdf) | Implemented |
+| Text extraction | Implemented |
+| Configurable chunking | Implemented |
+| Local embeddings (Sentence Transformers) | Implemented |
+| Persistent ChromaDB indexing | Implemented |
+| Metadata preservation | Implemented |
+| Semantic retrieval wired to `/ask` | **Not implemented** |
+| LLM answer generation | **Not implemented** |
+| Real source citations | **Not implemented** |
 | Tests / evaluation / Docker / CI/CD | **Not implemented** |
 
 ## Local Development
 
-You can run the current FastAPI backend on your own computer. The backend only exposes a minimal `GET /health` endpoint so far.
+You can run the current FastAPI backend on your own computer. The backend currently exposes `GET /health` and a typed `POST /ask` placeholder contract.
 
-For setup steps, see [`docs/local-development.md`](docs/local-development.md).
+To build the local vector index from sample documents, see the indexing command in **Currently implemented**.
+
+For API setup steps, see [`docs/local-development.md`](docs/local-development.md).
 
 ## Backend Dependencies
 
 The packages needed to run the backend are documented in [`docs/backend-dependencies.md`](docs/backend-dependencies.md).
 
-Dependencies currently support the FastAPI health endpoint only.
+Dependencies now also include local RAG indexing libraries: `pypdf`, `sentence-transformers`, and `chromadb`.
 
 ## Learning notes
 

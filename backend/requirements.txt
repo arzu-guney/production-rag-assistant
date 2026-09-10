@@ -1,2 +1,12 @@
-fastapi
-uvicorn[standard]
+# FastAPI / ASGI server
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.32.0,<1.0.0
+
+# PDF text extraction
+pypdf>=5.0.0,<6.0.0
+
+# Local embedding model runtime
+sentence-transformers>=3.0.0,<4.0.0
+
+# Persistent local vector database
+chromadb>=0.5.23,<0.7.0
