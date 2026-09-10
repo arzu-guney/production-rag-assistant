@@ -33,9 +33,13 @@ Learn how Retrieval-Augmented Generation (RAG) works by building a small assista
 - Gemini grounded answer generation
 - Deterministic source citations from retrieval metadata
 - Basic empty-collection / missing-key / generation error handling
+- Automated pytest suite (API, chunking, mocked `/ask`, optional slow retrieval/index tests)
+- Golden evaluation dataset + retrieval Hit Rate@K / MRR harness
+- Optional live Gemini generation evaluation (separate from pytest)
 
 Canonical entry point: `backend/app/main.py`  
-Canonical dependencies: `backend/requirements.txt`
+Canonical dependencies: `backend/requirements.txt`  
+Dev/test dependencies: `backend/requirements-dev.txt`
 
 ### Ask flow
 
@@ -94,23 +98,123 @@ Indexing is separate from asking. Questions reuse the existing Chroma collection
 | Vector DB path | `backend/data/vector_store` | `VECTOR_DB_PATH` |
 | Collection | `documents` | `COLLECTION_NAME` |
 | Retrieval top_k | `4` | `RETRIEVAL_TOP_K` |
-| Gemini model | `gemini-2.0-flash` | `GEMINI_MODEL` |
+| Gemini model | `gemini-3.6-flash` | `GEMINI_MODEL` |
 | Gemini API key | (required for `/ask`) | `GEMINI_API_KEY` |
 
 `top_k=4` balances enough context for a short sample corpus without flooding the prompt.
 
-**Gemini model choice:** `gemini-2.0-flash` is fast and cost-efficient for a portfolio demo. Override with `GEMINI_MODEL` if needed.
+**Gemini model choice:** `gemini-3.6-flash` is the project default for grounded `/ask` answers. Override with `GEMINI_MODEL` if needed.
 
 **Distance threshold:** Chroma cosine space returns distances (lower = closer). No hard relevance cutoff is applied yet — choosing one needs evaluation data. The prompt still tells Gemini to refuse when context is insufficient.
 
 ## Planned
 
-- Automated RAG evaluation / golden dataset / retrieval metrics
 - Hybrid retrieval and reranking
 - Observability
-- Comprehensive automated tests
+- Broader automated tests / CI coverage
 - Docker and CI/CD
 - Stronger prompt-injection / security controls
+- Optional LLM-as-a-judge faithfulness scoring (later iteration)
+
+## Testing and Evaluation
+
+### Automated tests
+
+From `backend/` (Python 3.11 venv active):
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Fast tests only (skip embedding/Chroma-heavy cases):
+
+```powershell
+python -m pytest -m "not slow"
+```
+
+What they verify:
+
+- `GET /health` response shape
+- `POST /ask` request validation (empty/whitespace/missing/too-long)
+- `/ask` wiring with a **fake** RAG service (no live Gemini)
+- chunking behaviour (overlap, IDs, invalid config)
+- slow tests: temporary-index idempotency and semantic retrieval on a tiny corpus
+
+Production test suites should not call live LLM APIs for basic correctness: LLM output is non-deterministic, slow, costly, and can fail for network/quota reasons unrelated to your code.
+
+### Retrieval evaluation
+
+Requires an already-indexed sample corpus (`python -m app.ingestion.indexer --path data/documents`).
+
+```powershell
+python -m evals.evaluate_retrieval
+```
+
+Uses `evals/golden_dataset.json`:
+
+- **Hit Rate @ K**: share of answerable questions where at least one top-k chunk contains expected evidence (normalized substring match)
+- **MRR**: mean of `1/rank` for the first evidence-bearing chunk (0 if none)
+
+This evidence check is a **lightweight portfolio metric** for a controlled sample document, not a universal semantic relevance judge. Failures print question ID, expected evidence, and ranked chunk previews.
+
+Do not treat scores as “production quality” claims until you measure them locally and understand failures.
+
+### Optional generation evaluation
+
+Requires `GEMINI_API_KEY` and an indexed corpus.
+
+**Important cost/safety notes:**
+
+- `pytest` never calls Gemini
+- retrieval evaluation never calls Gemini
+- live generation evaluation is an **explicit manual command only**
+- by default it runs only **3 cases** to protect limited/free Gemini quotas
+- this project never enables billing; quota/billing depends on your Google account/plan
+- on 429 rate-limit/quota errors the harness reports the failure and continues (no automatic retries that multiply usage)
+
+```powershell
+# Cheapest live check: exactly one Gemini request
+python -m evals.evaluate_generation --max-cases 1 --delay-seconds 15 --stop-on-provider-error
+
+# Default small batch (3 cases)
+python -m evals.evaluate_generation --max-cases 3 --delay-seconds 15
+
+# Full golden dataset (uses more quota — opt in explicitly)
+python -m evals.evaluate_generation --all --delay-seconds 15
+```
+
+Before requests begin, the command prints cases, max external requests, timeout, and retry policy.
+
+The Gemini client uses a **60s HTTP timeout** and **disables SDK retries** (`HttpRetryOptions(attempts=1)`). By default google-genai would retry up to 5 times with backoff on 429, which can look like a hang and multiply quota usage.
+
+On 429/timeout the harness reports the failure and continues (or stops with `--stop-on-provider-error`). No automatic retries.
+
+### Current evaluation baseline
+
+Measured locally on Windows / Python 3.11.9 against the small golden dataset (`evals/golden_dataset.json`) and the sample knowledge document.
+
+**Retrieval evaluation (7 answerable cases, top-k = 4):**
+
+| Metric | Result |
+|--------|--------|
+| Hit Rate @4 | **85.7%** (6/7) |
+| MRR | **0.857** |
+
+How to read this:
+
+- This is a **baseline on a small controlled portfolio dataset**, not a production RAG benchmark.
+- These scores should **not** be interpreted as general RAG accuracy for arbitrary corpora or domains.
+- One retrieval failure is intentionally preserved for analysis: **`ans-006`** (“How does POST /ask use retrieved chunks in this project?”).
+- The golden dataset and retrieval settings were **not** changed just to raise the score.
+- Improving that miss (for example via chunking or retrieval experiments) is a **future** improvement area.
+
+**Live generation evaluation:**
+
+- Opt-in and cost-conscious (manual command; limited `--max-cases`; no automatic retries).
+- A single successful live case was smoke-tested locally; that is **not** a generation-quality benchmark and must not be reported as “100% accuracy.”
+
+Automated pytest: **15 passed** in the same local environment. Dependency/deprecation warnings may appear and currently do not fail the suite.
 
 ## Current status
 
@@ -120,7 +224,11 @@ Indexing is separate from asking. Questions reuse the existing Chroma collection
 | Semantic retrieval | Implemented |
 | Gemini grounded `/ask` | Implemented |
 | Deterministic citations | Implemented |
-| Evaluation / tests / Docker / CI | **Not implemented** |
+| Automated tests (pytest) | Implemented |
+| Golden dataset + retrieval eval | Implemented |
+| Optional generation eval | Implemented |
+| LLM-as-a-judge | **Not implemented** (deferred) |
+| Docker / CI | **Not implemented** |
 
 ## Documentation
 

@@ -69,7 +69,7 @@ GEMINI_API_KEY=your_real_key_here
 Optional:
 
 ```text
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.6-flash
 RETRIEVAL_TOP_K=4
 ```
 

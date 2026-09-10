@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "description": "Small golden set for the sample-rag-overview.md knowledge base. Evidence phrases are normalized substring checks against retrieved chunk text—not a universal relevance metric.",
+  "source_document": "sample-rag-overview.md",
+  "cases": [
+    {
+      "id": "ans-001",
+      "question": "What is retrieval-augmented generation?",
+      "answerable": true,
+      "expected_evidence": [
+        "Retrieval-Augmented Generation",
+        "retrieves relevant text",
+        "ground answers in your own documents"
+      ],
+      "expected_answer_concepts": ["retrieve", "context", "documents"]
+    },
+    {
+      "id": "ans-002",
+      "question": "Why do we split large documents into chunks before embedding?",
+      "answerable": true,
+      "expected_evidence": [
+        "split into smaller chunks",
+        "Chunk size controls"
+      ],
+      "expected_answer_concepts": ["chunk", "embedding"]
+    },
+    {
+      "id": "ans-003",
+      "question": "What does chunk overlap help with?",
+      "answerable": true,
+      "expected_evidence": [
+        "Overlap keeps neighbouring chunks",
+        "boundary between two windows"
+      ],
+      "expected_answer_concepts": ["overlap", "boundary"]
+    },
+    {
+      "id": "ans-004",
+      "question": "Why must documents and future user queries use the same embedding model?",
+      "answerable": true,
+      "expected_evidence": [
+        "same embedding model must be used",
+        "same vector space"
+      ],
+      "expected_answer_concepts": ["same", "vector space"]
+    },
+    {
+      "id": "ans-005",
+      "question": "What information does a vector database store for each chunk?",
+      "answerable": true,
+      "expected_evidence": [
+        "embedding vector for each chunk",
+        "original chunk text",
+        "metadata such as source filename"
+      ],
+      "expected_answer_concepts": ["embedding", "metadata", "chunk text"]
+    },
+    {
+      "id": "ans-006",
+      "question": "How does POST /ask use retrieved chunks in this project?",
+      "answerable": true,
+      "expected_evidence": [
+        "retrieves relevant indexed chunks",
+        "source citations derived from retrieval metadata"
+      ],
+      "expected_answer_concepts": ["retrieve", "Gemini", "citations"]
+    },
+    {
+      "id": "ans-007",
+      "question": "What should I avoid placing in the sample documents folder?",
+      "answerable": true,
+      "expected_evidence": [
+        "private or copyrighted documents"
+      ],
+      "expected_answer_concepts": ["private", "copyrighted"]
+    },
+    {
+      "id": "unans-001",
+      "question": "What is the capital of France?",
+      "answerable": false,
+      "expected_evidence": [],
+      "expected_answer_concepts": []
+    },
+    {
+      "id": "unans-002",
+      "question": "How do I deploy Kubernetes on AWS?",
+      "answerable": false,
+      "expected_evidence": [],
+      "expected_answer_concepts": []
+    },
+    {
+      "id": "unans-003",
+      "question": "Who won the 2018 FIFA World Cup?",
+      "answerable": false,
+      "expected_evidence": [],
+      "expected_answer_concepts": []
+    },
+    {
+      "id": "unans-004",
+      "question": "What is the boiling point of ethanol in Celsius?",
+      "answerable": false,
+      "expected_evidence": [],
+      "expected_answer_concepts": []
+    }
+  ]
+}

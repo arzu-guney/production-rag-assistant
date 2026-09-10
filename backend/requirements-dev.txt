@@ -1,0 +1,6 @@
+# Runtime dependencies for the RAG API and indexer
+-r requirements.txt
+
+# Test / evaluation tooling (not required to serve /ask)
+pytest>=8.0.0,<9.0.0
+httpx>=0.27.0,<1.0.0

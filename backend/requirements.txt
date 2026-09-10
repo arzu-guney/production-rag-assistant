@@ -16,3 +16,6 @@ chromadb>=0.5.23,<0.7.0
 
 # Google Gemini (current Gen AI SDK)
 google-genai>=1.0.0,<2.0.0
+
+# Keep PostHog on a Chroma-compatible API (avoid capture() signature breakage in PostHog 6+/7+)
+posthog>=2.4.0,<4.0.0

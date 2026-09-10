@@ -221,3 +221,9 @@ __marimo__/
 backend/data/vector_store/
 **/chroma/
 *.chroma
+
+# Test / evaluation local artifacts
+.pytest_cache/
+backend/.pytest_cache/
+backend/evals/output/
+backend/evals/results/

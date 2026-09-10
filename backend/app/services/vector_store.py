@@ -28,11 +28,15 @@ class VectorStore:
         self.collection_name = collection_name
         self.persist_path.mkdir(parents=True, exist_ok=True)
         # Disable anonymized telemetry via supported Chroma settings.
-        # Avoids noisy ClientStartEvent / ClientCreateCollectionEvent warnings
-        # from a telemetry client mismatch while leaving real errors visible.
+        # Also keep PostHog pinned <4 in requirements.txt: newer PostHog breaks
+        # Chroma's capture() call and logs noisy Client*Event failures even when
+        # anonymized_telemetry=False.
         self._client = chromadb.PersistentClient(
             path=str(self.persist_path),
-            settings=Settings(anonymized_telemetry=False),
+            settings=Settings(
+                anonymized_telemetry=False,
+                is_persistent=True,
+            ),
         )
         self._collection = self._client.get_or_create_collection(
             name=self.collection_name,

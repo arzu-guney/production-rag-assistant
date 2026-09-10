@@ -31,12 +31,26 @@ pip install -r requirements.txt
 | `pypdf` | PDF text extraction |
 | `sentence-transformers` | Local embeddings for documents and queries |
 | `chromadb` | Persistent local vector store |
+| `posthog` (`>=2.4,<4`) | Direct pin for Chroma compatibility; PostHog 6+/7+ breaks Chroma telemetry `capture()` and causes noisy Client*Event errors |
 
 ### Generation
 
 | Package | Why it exists |
 |---------|----------------|
 | `google-genai` | Current Google Gen AI SDK for Gemini grounded answers |
+
+### Development / tests (`requirements-dev.txt`)
+
+| Package | Why it exists |
+|---------|----------------|
+| `pytest` | Automated unit and integration tests |
+| `httpx` | Required by FastAPI `TestClient` for HTTP API tests |
+
+Install with:
+
+```text
+pip install -r requirements-dev.txt
+```
 
 ## Notes
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.exceptions import (
     ConfigurationError,
@@ -10,15 +10,18 @@ from app.core.exceptions import (
 )
 from app.dependencies import get_rag_service
 from app.schemas.ask import AskRequest, AskResponse
+from app.services.rag import RagService
 
 router = APIRouter(tags=["ask"])
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_question(payload: AskRequest) -> AskResponse:
+async def ask_question(
+    payload: AskRequest,
+    rag: RagService = Depends(get_rag_service),
+) -> AskResponse:
     """Retrieve context, generate a grounded Gemini answer, and return citations."""
     try:
-        rag = get_rag_service()
         return await rag.ask(payload.question)
     except ConfigurationError as exc:
         raise HTTPException(
