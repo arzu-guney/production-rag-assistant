@@ -36,6 +36,8 @@ Learn how Retrieval-Augmented Generation (RAG) works by building a small assista
 - Automated pytest suite (API, chunking, mocked `/ask`, optional slow retrieval/index tests)
 - Golden evaluation dataset + retrieval Hit Rate@K / MRR harness
 - Optional live Gemini generation evaluation (separate from pytest)
+- Docker image for reproducible API + indexing runs
+- GitHub Actions CI (fast tests + Docker build; no live Gemini)
 
 Canonical entry point: `backend/app/main.py`  
 Canonical dependencies: `backend/requirements.txt`  
@@ -228,13 +230,100 @@ Automated pytest: **15 passed** in the same local environment. Dependency/deprec
 | Golden dataset + retrieval eval | Implemented |
 | Optional generation eval | Implemented |
 | LLM-as-a-judge | **Not implemented** (deferred) |
-| Docker / CI | **Not implemented** |
+| Docker | Implemented (`backend/Dockerfile`) |
+| GitHub Actions CI | Implemented (`.github/workflows/ci.yml`) |
+
+## Docker
+
+This project ships a **production-oriented** container for the FastAPI backend. It is reproducible local packaging — not a claim that the system is fully production-ready or cloud-deployed.
+
+### Build
+
+From the repository root (or from `backend/` with adjusted paths):
+
+```powershell
+cd C:\Users\arzug\production-rag-assistant\backend
+docker build -t production-rag-assistant:local .
+```
+
+Why `--reload` is not used in the image: reload is for local development (auto-restart on code changes). In a container you want a stable long-running process, clearer logs, and no extra file-watching overhead.
+
+### Persist Chroma data
+
+Do **not** bake `data/vector_store` into the image. Mount a named volume (or bind mount) so the index survives container replacement:
+
+| Concept | Meaning |
+|---------|---------|
+| Image | Immutable build artifact (code + dependencies) |
+| Container filesystem | Ephemeral runtime layer (lost when the container is removed) |
+| Volume | Persistent storage outside the container lifecycle |
+
+Example volume name: `rag_vector_store` → `/app/data/vector_store`
+
+### Index sample documents
+
+```powershell
+cd C:\Users\arzug\production-rag-assistant\backend
+docker run --rm `
+  -v rag_vector_store:/app/data/vector_store `
+  production-rag-assistant:local `
+  python -m app.ingestion.indexer --path data/documents
+```
+
+### Run API
+
+Inject secrets at runtime. Never bake `GEMINI_API_KEY` into the image.
+
+Use container-relative paths in `.env` if you set `VECTOR_DB_PATH` / `DOCUMENTS_PATH` (for example `data/vector_store`). Do not pass Windows absolute paths into the container.
+
+```powershell
+cd C:\Users\arzug\production-rag-assistant\backend
+docker run --rm -p 8000:8000 `
+  --env-file .env `
+  -v rag_vector_store:/app/data/vector_store `
+  production-rag-assistant:local
+```
+
+Optional: mount a Hugging Face cache volume so the Sentence Transformer model is not re-downloaded on every fresh container:
+
+`-v hf_cache:/root/.cache/huggingface`
+
+### Test health endpoint
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+## Continuous Integration
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+On pushes and pull requests to `main`, CI:
+
+1. Sets up **Python 3.11**
+2. Installs runtime + development dependencies
+3. Runs **fast** automated tests: `pytest -m "not slow"`
+4. Performs a lightweight import check
+5. Builds the Docker image (build-only; no push/deploy)
+
+CI intentionally does **not**:
+
+- require `GEMINI_API_KEY`
+- call Gemini
+- run `evals.evaluate_generation`
+- consume external LLM quota
+
+Why: normal CI should stay deterministic and cost-free from an LLM-API perspective. Live generation evaluation remains a **manual**, rate-limit-aware command for developers.
+
+Slow semantic/indexing tests (`@pytest.mark.slow`) stay valuable locally; excluding them from default CI avoids large model downloads on every push while keeping the PR feedback loop fast.
 
 ## Documentation
 
 - [`docs/local-development.md`](docs/local-development.md)
 - [`docs/backend-dependencies.md`](docs/backend-dependencies.md)
 - [`backend/.env.example`](backend/.env.example)
+- [`backend/Dockerfile`](backend/Dockerfile)
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 - Learning notes under [`notes/`](notes/)
 
 Supported local runtime: **Python 3.11** (especially on Windows, for Chroma wheels).

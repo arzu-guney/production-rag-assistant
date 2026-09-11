@@ -1,0 +1,38 @@
+# Keep the Docker build context small and secret-free.
+
+# Local virtualenvs and secrets
+.venv/
+.env
+.env.*
+!.env.example
+
+# Python caches / test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+pytest-cache-files-*/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime vector DB must not be baked into the image
+data/vector_store/
+**/chroma/
+
+# Local tooling / VCS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Dev-only paths (not required to serve or index)
+tests/
+evals/
+requirements-dev.txt
+pytest.ini
