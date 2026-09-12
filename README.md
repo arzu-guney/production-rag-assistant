@@ -82,7 +82,7 @@ flowchart TD
 1. **Local embeddings over external APIs:** Sentence Transformers (`all-MiniLM-L6-v2`) generate 384-dimensional dense vectors locally. This eliminates embedding API costs, removes third-party rate limits during indexing, and guarantees that documents and queries exist in the exact same vector space.
 2. **Deterministic citations from retrieval metadata:** LLMs frequently hallucinate sources when asked to cite document names in natural language. Citations in this project are constructed directly from retrieved chunk metadata (source file, page number, chunk ID) and attached by the application layer.
 3. **Deterministic tests decoupled from LLMs:** Automated test suites in `tests/` never call Gemini. API integration tests override `get_rag_service` with a `FakeRagService`. This prevents test flakiness, latency, network dependency, and API quota burn.
-4. **Zero-secret Continuous Integration:** GitHub Actions executes all 35 fast tests and validates the Docker build without requiring `GEMINI_API_KEY`. CI remains 100% deterministic, free, and green.
+4. **Zero-secret Continuous Integration:** GitHub Actions executes all 35 fast tests and validates the Docker build without requiring `GEMINI_API_KEY`. CI remains deterministic, requires no LLM API secrets, and incurs no LLM API cost.
 5. **Baseline before optimization:** Rather than guessing retrieval improvements, a baseline was established on a 11-case golden dataset. When `ans-006` failed, the failure was inspected before changing code.
 6. **Single-variable experimentation:** To fix `ans-006`, only the chunk boundary strategy was altered. Target chunk size (500), overlap (100), embedding model, vector space, and `top_k=4` were held constant to ensure valid causal attribution.
 7. **Stateless container, stateful volume:** The vector database (`data/vector_store`) is never baked into the Docker image. It persists across container lifecycles via a named Docker volume (`rag_vector_store`), keeping image artifacts immutable and portable.
@@ -295,7 +295,7 @@ This project is an applied AI engineering milestone with deliberate scope bounda
 - **No authentication / authorization:** The API does not implement API key verification or OAuth; it is intended to sit behind an API gateway in real production deployments.
 - **No reranking or hybrid search:** Retrieval relies on bi-encoder cosine similarity. Hybrid BM25 retrieval and cross-encoder reranking are natural next steps.
 - **No distributed tracing backend:** Request correlation uses `X-Request-ID` and JSON logs. OpenTelemetry spans and collector export are deferred.
-- **Docker image size:** The image is approximately 9-10 GB uncompressed due to PyTorch and sentence-transformer dependencies on Python 3.11-slim.
+- **Docker image size:** The image is approximately 9–10 GB uncompressed on Linux because standard PyPI installation of PyTorch (pulled in by `sentence-transformers`) bundles default NVIDIA CUDA runtime wheels (such as `cuda-toolkit`, `nvidia-cudnn`, and `triton`), even though the application runs purely in CPU-only mode.
 - **Cold start latency:** The first embedding request after startup incurs a 2-3 second model initialization delay on CPU.
 - **External LLM dependency:** Grounded answer generation relies on Google Gemini availability and rate limits.
 
@@ -305,7 +305,7 @@ This project is an applied AI engineering milestone with deliberate scope bounda
 
 - **Multi-document evaluation corpus:** Expand golden datasets across complex document layouts, tables, and varied domains.
 - **Hybrid retrieval & reranking:** Benchmark BM25 + dense retrieval with a cross-encoder reranker (e.g., `bge-reranker-base`).
-- **CPU optimization:** Export embeddings to ONNX Runtime / int8 quantization to reduce Docker image size and inference latency.
+- **CPU optimization:** Point pip to CPU-specific PyTorch wheels (`--index-url https://download.pytorch.org/whl/cpu`) or export embeddings to ONNX Runtime / int8 quantization to drastically reduce Docker image size and inference latency.
 - **OpenTelemetry integration:** Export OTLP trace spans from the existing stage timers to Jaeger or Grafana Tempo.
 - **Cloud vector store migration:** Support external managed vector databases (e.g., Pinecone, Qdrant, pgvector).
 
