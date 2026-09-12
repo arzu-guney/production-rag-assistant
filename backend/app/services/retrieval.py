@@ -32,6 +32,11 @@ class RetrievalService:
         self._vector_store = vector_store
         self._top_k = top_k
 
+    @property
+    def top_k(self) -> int:
+        """Configured number of nearest chunks to retrieve."""
+        return self._top_k
+
     def retrieve(self, question: str) -> list[RetrievedChunk]:
         if self._vector_store.count == 0:
             raise EmptyKnowledgeBaseError(

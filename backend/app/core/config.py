@@ -62,6 +62,14 @@ class Settings(BaseModel):
         min_length=1,
         description="Gemini model id for grounded answer generation.",
     )
+    log_level: str = Field(
+        default="INFO",
+        description="Application logging level (DEBUG, INFO, WARNING, ERROR).",
+    )
+    log_format: str = Field(
+        default="json",
+        description="Application logging format ('json' or 'text').",
+    )
 
     @model_validator(mode="after")
     def overlap_must_be_less_than_size(self) -> Settings:
@@ -101,4 +109,6 @@ def get_settings() -> Settings:
         retrieval_top_k=int(top_k) if top_k else 4,
         gemini_api_key=(_env("GEMINI_API_KEY", "") or "").strip(),
         gemini_model=(_env("GEMINI_MODEL", "gemini-3.6-flash") or "gemini-3.6-flash").strip(),
+        log_level=(_env("LOG_LEVEL", "INFO") or "INFO").strip().upper(),
+        log_format=(_env("LOG_FORMAT", "json") or "json").strip().lower(),
     )

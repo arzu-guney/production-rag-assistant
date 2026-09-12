@@ -38,6 +38,10 @@ Learn how Retrieval-Augmented Generation (RAG) works by building a small assista
 - Optional live Gemini generation evaluation (separate from pytest)
 - Docker image for reproducible API + indexing runs
 - GitHub Actions CI (fast tests + Docker build; no live Gemini)
+- Structured JSON logging to `stdout` with configurable `LOG_LEVEL` and `LOG_FORMAT`
+- Request correlation via `X-Request-ID` and async `contextvars` propagation
+- Stage-level RAG observability (retrieval and generation latency, chunk counts, citation counts)
+- Privacy-conscious logging policy (zero logging of questions, chunks, answers, or API keys)
 
 Canonical entry point: `backend/app/main.py`  
 Canonical dependencies: `backend/requirements.txt`  
@@ -102,6 +106,8 @@ Indexing is separate from asking. Questions reuse the existing Chroma collection
 | Retrieval top_k | `4` | `RETRIEVAL_TOP_K` |
 | Gemini model | `gemini-3.6-flash` | `GEMINI_MODEL` |
 | Gemini API key | (required for `/ask`) | `GEMINI_API_KEY` |
+| Log level | `INFO` | `LOG_LEVEL` |
+| Log format | `json` | `LOG_FORMAT` |
 
 `top_k=4` balances enough context for a short sample corpus without flooding the prompt.
 
@@ -112,9 +118,7 @@ Indexing is separate from asking. Questions reuse the existing Chroma collection
 ## Planned
 
 - Hybrid retrieval and reranking
-- Observability
 - Broader automated tests / CI coverage
-- Docker and CI/CD
 - Stronger prompt-injection / security controls
 - Optional LLM-as-a-judge faithfulness scoring (later iteration)
 
@@ -232,6 +236,7 @@ Automated pytest: **15 passed** in the same local environment. Dependency/deprec
 | LLM-as-a-judge | **Not implemented** (deferred) |
 | Docker | Implemented (`backend/Dockerfile`) |
 | GitHub Actions CI | Implemented (`.github/workflows/ci.yml`) |
+| Observability | Implemented (structured JSON, request correlation, stage timing) |
 
 ## Docker
 
@@ -316,6 +321,75 @@ CI intentionally does **not**:
 Why: normal CI should stay deterministic and cost-free from an LLM-API perspective. Live generation evaluation remains a **manual**, rate-limit-aware command for developers.
 
 Slow semantic/indexing tests (`@pytest.mark.slow`) stay valuable locally; excluding them from default CI avoids large model downloads on every push while keeping the PR feedback loop fast.
+
+## Observability
+
+This project implements lightweight, production-oriented observability using the Python standard library. It avoids heavy tracing dependencies, external daemons, or vendor lock-in.
+
+### Key capabilities
+
+- **Structured JSON logging:** Emits machine-readable single-line JSON logs to `stdout`/`stderr` for natural container capture (Docker, Kubernetes, cloud log routers).
+- **Request correlation (`X-Request-ID`):** Generates or reuses a sanitized request correlation ID for every incoming request. The ID is returned in the `X-Request-ID` HTTP response header and injected into all log events during the request lifecycle.
+- **Context-local propagation:** Uses `contextvars.ContextVar` to automatically propagate the request correlation ID across async tasks and worker threads without passing `request_id` through every function signature. Tokens are strictly reset in `finally` blocks to prevent state leakage.
+- **HTTP request completion logging:** Logs HTTP method, path, status code, duration, and request ID. Routine successful `/health` checks (200 OK) are logged at `DEBUG` level to prevent log flooding in container environments, while degraded health checks are surfaced at `WARNING`/`ERROR`.
+- **RAG stage timing:** Uses monotonic clocks (`time.perf_counter()`) to measure distinct pipeline stages:
+  - `rag_request_started`: captures question length and retrieval `top_k`.
+  - `retrieval_completed`: captures retrieval duration, chunks returned, top-k, and distinct source count.
+  - `generation_completed`: captures model name, generation duration, and citation count.
+  - `rag_request_completed`: captures end-to-end RAG request latency.
+- **Structured error logging:** Categorizes domain failures (`ConfigurationError`, `EmptyKnowledgeBaseError`, `NoRelevantContextError`, `RetrievalError`, `GenerationError`) without printing giant stack traces or sensitive external payload dumps.
+
+### Privacy-conscious logging policy
+
+To safeguard user privacy and prevent credential/data leakage, the logging pipeline strictly enforces a zero-content-logging policy:
+- **NEVER logged:** `GEMINI_API_KEY`, Authorization headers, `.env` file contents, full user questions, retrieved document chunks, generated answer text, or embedding vectors.
+- **ONLY logged:** Safe diagnostic metadata such as string lengths, counts, durations in milliseconds, HTTP status codes, error categories, and correlation IDs.
+
+### Example structured log lines (synthetic values)
+
+Retrieval completion event:
+```json
+{
+  "timestamp": "2026-09-12T09:30:15.123456Z",
+  "level": "INFO",
+  "logger": "app.rag",
+  "event": "retrieval_completed",
+  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+  "top_k": 4,
+  "chunks_returned": 4,
+  "source_count": 1,
+  "duration_ms": 18.7
+}
+```
+
+Generation completion event:
+```json
+{
+  "timestamp": "2026-09-12T09:30:16.456789Z",
+  "level": "INFO",
+  "logger": "app.rag",
+  "event": "generation_completed",
+  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+  "model": "gemini-3.6-flash",
+  "citation_count": 2,
+  "duration_ms": 612.4
+}
+```
+
+HTTP request completion event:
+```json
+{
+  "timestamp": "2026-09-12T09:30:16.460123Z",
+  "level": "INFO",
+  "logger": "app.http",
+  "event": "http_request_completed",
+  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+  "method": "POST",
+  "path": "/ask",
+  "status_code": 200,
+  "duration_ms": 635.8
+}
+```
 
 ## Documentation
 
