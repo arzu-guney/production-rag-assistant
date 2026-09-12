@@ -20,6 +20,7 @@ from app.dependencies import get_rag_service
 from app.main import app
 from app.services.rag import RagService
 from app.services.retrieval import RetrievedChunk
+from tests.conftest import FakeRagService
 
 
 def test_health_response_contains_valid_uuid_request_id(client) -> None:
@@ -69,8 +70,14 @@ def test_request_ids_do_not_leak_between_requests(client) -> None:
 
 
 def test_validation_error_response_still_receives_request_id(client) -> None:
-    # Empty question triggers Pydantic RequestValidationError (422)
-    response = client.post("/ask", json={"question": "   "})
+    # Use fake RAG so validation test never depends on GEMINI_API_KEY
+    app.dependency_overrides[get_rag_service] = FakeRagService
+    try:
+        # Empty question triggers Pydantic RequestValidationError (422)
+        response = client.post("/ask", json={"question": "   "})
+    finally:
+        app.dependency_overrides.clear()
+
     assert response.status_code == 422
     assert "X-Request-ID" in response.headers
     parsed = uuid.UUID(response.headers["X-Request-ID"], version=4)
