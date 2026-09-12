@@ -1,435 +1,330 @@
 # production-rag-assistant
 
-A step-by-step **Applied AI Engineering** project. This repository is being developed into a **production-oriented RAG application** and a **public learning resource**.
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![CI](https://github.com/arzucaner/production-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/arzucaner/production-rag-assistant/actions/workflows/ci.yml)
 
-It is built slowly and deliberately: each step should be understandable before the next layer is added.
+A production-oriented Retrieval-Augmented Generation (RAG) backend built with Python 3.11, FastAPI, local Sentence Transformers, persistent ChromaDB, and Google Gemini.
 
-This is **not** a finished production-ready system. It is a production-oriented learning project with a working local RAG path.
+This repository demonstrates applied AI engineering fundamentals across the full RAG lifecycle: document loading and boundary-aware semantic chunking, local vector indexing, semantic retrieval, grounded generation with deterministic citations, golden-set retrieval evaluation, cost-conscious LLM testing, containerisation with Docker, GitHub Actions CI, and privacy-conscious structured observability.
 
-## Project goal
+It is designed as an educational, portfolio-grade project emphasizing empirical evaluation and engineering trade-offs rather than framework magic.
 
-Learn how Retrieval-Augmented Generation (RAG) works by building a small assistant that can answer questions using my own documents — with room later for evaluation, observability, Docker, and CI/CD.
+---
 
-## A very simple explanation of RAG
+## Highlights
 
-**RAG** stands for **Retrieval-Augmented Generation**.
+- **End-to-end RAG pipeline:** Modular, testable architecture separating document ingestion, vector retrieval, and LLM generation.
+- **Boundary-aware semantic chunking:** Splits documents cleanly along paragraphs, sentences, and words to preserve semantic evidence.
+- **Cost-free local embeddings:** Sentence Transformers (`all-MiniLM-L6-v2`) embed documents and queries locally without external API dependencies or costs.
+- **Deterministic source citations:** Citation metadata (source name, page number, chunk ID) is mapped directly from retrieval results, never hallucinated by the LLM.
+- **Empirical retrieval evaluation:** Offline golden-set evaluation harness measuring Hit Rate@K and Mean Reciprocal Rank (MRR) without calling external LLM APIs.
+- **Zero-secret CI:** GitHub Actions runs 35 fast deterministic tests and validates Docker builds without needing external credentials or LLM quotas.
+- **Lightweight observability:** Structured JSON logging to `stdout`, `X-Request-ID` request correlation via `ContextVar`, monotonic stage timing (`time.perf_counter()`), and strict exclusion of sensitive payloads.
+- **Cost-bounded live LLM evaluation:** Optional CLI harness for generation quality with rate-limiting guardrails, HTTP timeouts, and disabled SDK retries.
 
-1. Index your documents (chunk → embed → store).
-2. When someone asks a question, **retrieve** relevant chunks.
-3. Send those chunks to a language model as **context**.
-4. The model **generates** an answer grounded in that context.
-5. Return **citations** from the retrieved chunks.
+---
 
-## Currently implemented
+## Measured Evaluation Results
 
-- FastAPI backend (`GET /health`, `POST /ask`)
-- Typed Pydantic request/response models and validation
-- Document loading for `.txt`, `.md`, `.pdf`
-- Configurable chunking with overlap
-- Local Sentence Transformers embeddings
-- Persistent ChromaDB vector indexing with metadata
-- Semantic retrieval (query embedding + top-k nearest chunks)
-- Structured context construction
-- Gemini grounded answer generation
-- Deterministic source citations from retrieval metadata
-- Basic empty-collection / missing-key / generation error handling
-- Automated pytest suite (API, chunking, mocked `/ask`, optional slow retrieval/index tests)
-- Golden evaluation dataset + retrieval Hit Rate@K / MRR harness
-- Optional live Gemini generation evaluation (separate from pytest)
-- Docker image for reproducible API + indexing runs
-- GitHub Actions CI (fast tests + Docker build; no live Gemini)
-- Structured JSON logging to `stdout` with configurable `LOG_LEVEL` and `LOG_FORMAT`
-- Request correlation via `X-Request-ID` and async `contextvars` propagation
-- Stage-level RAG observability (retrieval and generation latency, chunk counts, citation counts)
-- Privacy-conscious logging policy (zero logging of questions, chunks, answers, or API keys)
+Retrieval quality is measured empirically using `evals/golden_dataset.json` against the knowledge base with `top_k=4`:
 
-Canonical entry point: `backend/app/main.py`  
-Canonical dependencies: `backend/requirements.txt`  
-Dev/test dependencies: `backend/requirements-dev.txt`
+| Metric | Baseline (Fixed-Char Chunking) | Candidate (Boundary-Aware Chunking) | Delta |
+|---|:---:|:---:|:---:|
+| **Hit Rate @ 4** | 85.7% (6/7) | **100.0% (7/7)** | **+14.3%** |
+| **MRR** | 0.857 | **1.000** | **+0.143** |
+| **Failed Answerable Cases** | 1 (`ans-006`) | **0** | **-1** |
+| **`ans-006` Rank** | Rank 5 (Miss) | **Rank 1 (Hit)** | **+4 ranks** |
 
-### Ask flow
+> **Evaluation Disclaimer:** This is a small, controlled portfolio benchmark (7 answerable cases, 4 unanswerable cases on a controlled sample corpus). It proves that the retrieval improvement was achieved through an empirical chunking experiment—fixing boundary fragmentation without changing `top_k`, the embedding model, or the evaluation dataset. It is not a claim of general production accuracy across arbitrary corpora.
+>
+> Full experiment log: [`backend/evals/experiments/chunking_experiment.md`](backend/evals/experiments/chunking_experiment.md).
 
-```text
-POST /ask
-  → embed question (local)
-  → retrieve top-k chunks (Chroma)
-  → build labelled context
-  → generate answer (Gemini)
-  → return answer + citations from retrieved chunks
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph Ingestion ["1. Document Ingestion Pipeline"]
+    Docs["Source Documents\n(.txt, .md, .pdf)"] --> Loader["Document Loader\n(pypdf / plain text)"]
+    Loader --> Chunker["Boundary-Aware Chunker\n(Paragraph/Sentence Aware)"]
+    Chunker --> Embedder["Embedding Service\n(all-MiniLM-L6-v2)"]
+    Embedder --> VectorStore[("Persistent ChromaDB\n(Cosine Distance)")]
+  end
+
+  subgraph Serving ["2. Query & Generation Pipeline"]
+    User(["Client / API Consumer"]) -->|POST /ask\nX-Request-ID| FastApi["FastAPI App\n(Correlation Middleware)"]
+    FastApi --> Retriever["Retrieval Service\n(top_k=4)"]
+    Retriever -->|Query Vector| VectorStore
+    VectorStore -->|Top-k Chunks| Retriever
+    Retriever --> Context["Context Builder\n(Labelled Chunks)"]
+    Context --> GeminiClient["Gemini Service\n(gemini-3.6-flash)"]
+    GeminiClient -->|Async API Call| LLM[("Google Gemini API")]
+    LLM -->|Grounded Answer| GeminiClient
+    GeminiClient --> Formatter["Response Assembler"]
+    Retriever -.->|Citation Metadata| Formatter
+    Formatter -->|AskResponse\n+ Sources + X-Request-ID| User
+  end
+
+  subgraph Quality ["3. Evaluation, Testing & Telemetry"]
+    Golden["Golden Dataset\n(evals/golden_dataset.json)"] --> RetEval["Retrieval Eval Harness\n(Hit Rate@K / MRR)"]
+    RetEval -.-> Retriever
+    Pytest["Deterministic Tests\n(35 Fast + 2 Slow)"] -.->|Mock RAG| FastApi
+    Obs["Structured JSON Logs\n(stdout / monotonic timers)"] -.->|Latency & Counts| FastApi
+  end
 ```
 
-Example response shape:
+---
 
-```json
-{
-  "answer": "...",
-  "sources": [
-    {
-      "source": "sample-rag-overview.md",
-      "page": null,
-      "chunk_id": "chunk_..."
-    }
-  ]
-}
-```
+## Engineering Decisions
 
-### Local setup (Windows / Python 3.11)
+1. **Local embeddings over external APIs:** Sentence Transformers (`all-MiniLM-L6-v2`) generate 384-dimensional dense vectors locally. This eliminates embedding API costs, removes third-party rate limits during indexing, and guarantees that documents and queries exist in the exact same vector space.
+2. **Deterministic citations from retrieval metadata:** LLMs frequently hallucinate sources when asked to cite document names in natural language. Citations in this project are constructed directly from retrieved chunk metadata (source file, page number, chunk ID) and attached by the application layer.
+3. **Deterministic tests decoupled from LLMs:** Automated test suites in `tests/` never call Gemini. API integration tests override `get_rag_service` with a `FakeRagService`. This prevents test flakiness, latency, network dependency, and API quota burn.
+4. **Zero-secret Continuous Integration:** GitHub Actions executes all 35 fast tests and validates the Docker build without requiring `GEMINI_API_KEY`. CI remains 100% deterministic, free, and green.
+5. **Baseline before optimization:** Rather than guessing retrieval improvements, a baseline was established on a 11-case golden dataset. When `ans-006` failed, the failure was inspected before changing code.
+6. **Single-variable experimentation:** To fix `ans-006`, only the chunk boundary strategy was altered. Target chunk size (500), overlap (100), embedding model, vector space, and `top_k=4` were held constant to ensure valid causal attribution.
+7. **Stateless container, stateful volume:** The vector database (`data/vector_store`) is never baked into the Docker image. It persists across container lifecycles via a named Docker volume (`rag_vector_store`), keeping image artifacts immutable and portable.
+8. **Privacy-conscious structured logging:** Logs are formatted as single-line JSON to `stdout` for container log routers. Metadata such as request IDs, stage latencies, chunk counts, and model names are logged; user question text, document contents, answers, embeddings, and API keys are strictly excluded.
+9. **Async context-local request tracing:** `contextvars.ContextVar` propagates `X-Request-ID` from FastAPI middleware through coroutines and worker threads (`asyncio.to_thread`) without passing correlation arguments through every function signature. Tokens are reset in a `finally` block to prevent leakage across pooled tasks.
 
-```powershell
-cd backend
-py -3.11 -m venv .venv
-.venv\Scripts\activate
+---
+
+## Free Local Operations vs Live LLM Operations
+
+To protect external API quotas and avoid unnecessary billing, operations are divided by design:
+
+| Operation | Command | External LLM / Gemini Quota |
+|---|---|:---:|
+| **Unit & Integration Tests** | `pytest -m "not slow"` | **Zero (Free / Offline)** |
+| **Document Ingestion & Indexing** | `python -m app.ingestion.indexer` | **Zero (Free / Local Embeddings)** |
+| **Retrieval Evaluation** | `python -m evals.evaluate_retrieval` | **Zero (Free / Offline)** |
+| **Container Build & CI Checks** | `docker build`, GitHub Actions | **Zero (Free / No Secrets)** |
+| **API Liveness Check** | `GET /health` | **Zero (Free / Local)** |
+| **Live Grounded Question Answering** | `POST /ask` | **Consumes Gemini API Quota** |
+| **Bounded Live Generation Eval** | `python -m evals.evaluate_generation` | **Consumes Gemini API Quota** |
+
+---
+
+## Quick Start
+
+### Option A: Local Python (Windows / macOS / Linux)
+
+Prerequisites: **Python 3.11** (recommended for prebuilt Chroma binary wheels) and Git.
+
+```bash
+# 1. Clone repository and navigate to backend
+git clone https://github.com/arzucaner/production-rag-assistant.git
+cd production-rag-assistant/backend
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+# Windows PowerShell:  .venv\Scripts\Activate.ps1
+# Linux/macOS:         source .venv/bin/activate
+
+# 3. Install dependencies
+pip install --upgrade pip
 pip install -r requirements.txt
-copy .env.example .env
-# Edit .env and set GEMINI_API_KEY=...
+pip install -r requirements-dev.txt
 
-python -m app.ingestion.indexer --path data/documents
-uvicorn app.main:app --reload
+# 4. Configure environment
+copy .env.example .env    # Linux/macOS: cp .env.example .env
+# Edit .env and set GEMINI_API_KEY=your_key_here (only needed for POST /ask)
+
+# 5. Index sample documents into local ChromaDB
+python -m app.ingestion.indexer --path data/documents --clean
+
+# 6. Start the API server
+uvicorn app.main:app --reload --port 8000
 ```
 
-Then:
+Verify endpoints:
+```bash
+# Health check (zero LLM calls)
+curl http://127.0.0.1:8000/health
 
-- Health: `http://127.0.0.1:8000/health`
-- Ask: `POST http://127.0.0.1:8000/ask` with `{"question":"..."}`
-- Docs: `http://127.0.0.1:8000/docs`
+# Grounded Q&A (requires valid GEMINI_API_KEY)
+curl -X POST http://127.0.0.1:8000/ask \
+  -H "Content-Type: application/json" \
+  -d "{\"question\": \"What is retrieval-augmented generation?\"}"
+```
+Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
 
-Indexing is separate from asking. Questions reuse the existing Chroma collection; they do **not** re-index documents.
+---
 
-### Configuration defaults
+### Option B: Docker Container
 
-| Setting | Default | Env var |
-|---------|---------|---------|
-| Embedding model | `sentence-transformers/all-MiniLM-L6-v2` | `EMBEDDING_MODEL_NAME` |
-| Chunk size / overlap | `500` / `100` | `CHUNK_SIZE` / `CHUNK_OVERLAP` |
-| Vector DB path | `backend/data/vector_store` | `VECTOR_DB_PATH` |
-| Collection | `documents` | `COLLECTION_NAME` |
-| Retrieval top_k | `4` | `RETRIEVAL_TOP_K` |
-| Gemini model | `gemini-3.6-flash` | `GEMINI_MODEL` |
-| Gemini API key | (required for `/ask`) | `GEMINI_API_KEY` |
-| Log level | `INFO` | `LOG_LEVEL` |
-| Log format | `json` | `LOG_FORMAT` |
+The containerized backend packages Python 3.11-slim, application code, and dependencies into a reproducible image. Chroma data persists in a named volume.
 
-`top_k=4` balances enough context for a short sample corpus without flooding the prompt.
+```bash
+# 1. Navigate to backend
+cd production-rag-assistant/backend
 
-**Gemini model choice:** `gemini-3.6-flash` is the project default for grounded `/ask` answers. Override with `GEMINI_MODEL` if needed.
+# 2. Build the Docker image
+docker build -t production-rag-assistant:local .
 
-**Distance threshold:** Chroma cosine space returns distances (lower = closer). No hard relevance cutoff is applied yet — choosing one needs evaluation data. The prompt still tells Gemini to refuse when context is insufficient.
+# 3. Index sample documents into a persistent Docker volume
+docker run --rm \
+  -v rag_vector_store:/app/data/vector_store \
+  production-rag-assistant:local \
+  python -m app.ingestion.indexer --path data/documents --clean
 
-## Planned
+# 4. Run the API container with runtime secrets
+docker run --rm -p 8000:8000 \
+  --env-file .env \
+  -v rag_vector_store:/app/data/vector_store \
+  production-rag-assistant:local
 
-- Hybrid retrieval and reranking
-- Broader automated tests / CI coverage
-- Stronger prompt-injection / security controls
-- Optional LLM-as-a-judge faithfulness scoring (later iteration)
+# 5. Test health from host
+curl http://127.0.0.1:8000/health
+```
+
+---
 
 ## Testing and Evaluation
 
-### Automated tests
+### Automated Tests (pytest)
 
-From `backend/` (Python 3.11 venv active):
+From `backend/`:
 
-```powershell
-pip install -r requirements-dev.txt
+```bash
+# Fast deterministic test suite (35 tests, mock-backed, runs in ~1.5s, used by CI)
+python -m pytest -m "not slow"
+
+# Full test suite (37 tests, includes slow temporary embedding & Chroma tests)
 python -m pytest
 ```
 
-Fast tests only (skip embedding/Chroma-heavy cases):
+### Retrieval Evaluation (Hit Rate@K & MRR)
 
-```powershell
-python -m pytest -m "not slow"
-```
+Requires sample documents to be indexed first (`python -m app.ingestion.indexer --path data/documents --clean`):
 
-What they verify:
-
-- `GET /health` response shape
-- `POST /ask` request validation (empty/whitespace/missing/too-long)
-- `/ask` wiring with a **fake** RAG service (no live Gemini)
-- chunking behaviour (overlap, IDs, invalid config)
-- slow tests: temporary-index idempotency and semantic retrieval on a tiny corpus
-
-Production test suites should not call live LLM APIs for basic correctness: LLM output is non-deterministic, slow, costly, and can fail for network/quota reasons unrelated to your code.
-
-### Retrieval evaluation
-
-Requires an already-indexed sample corpus (`python -m app.ingestion.indexer --path data/documents`).
-
-```powershell
+```bash
 python -m evals.evaluate_retrieval
 ```
+Computes Hit Rate@4 and MRR against `evals/golden_dataset.json` using exact/normalized evidence substring matching.
 
-Uses `evals/golden_dataset.json`:
+### Optional Live Generation Evaluation
 
-- **Hit Rate @ K**: share of answerable questions where at least one top-k chunk contains expected evidence (normalized substring match)
-- **MRR**: mean of `1/rank` for the first evidence-bearing chunk (0 if none)
+Requires `GEMINI_API_KEY`. Live evaluation is intentionally an **opt-in manual CLI** with strict guardrails (disabled SDK retries, 60s timeout, delay between requests) to protect free-tier quotas:
 
-This evidence check is a **lightweight portfolio metric** for a controlled sample document, not a universal semantic relevance judge. Failures print question ID, expected evidence, and ranked chunk previews.
-
-Do not treat scores as “production quality” claims until you measure them locally and understand failures.
-
-### Optional generation evaluation
-
-Requires `GEMINI_API_KEY` and an indexed corpus.
-
-**Important cost/safety notes:**
-
-- `pytest` never calls Gemini
-- retrieval evaluation never calls Gemini
-- live generation evaluation is an **explicit manual command only**
-- by default it runs only **3 cases** to protect limited/free Gemini quotas
-- this project never enables billing; quota/billing depends on your Google account/plan
-- on 429 rate-limit/quota errors the harness reports the failure and continues (no automatic retries that multiply usage)
-
-```powershell
-# Cheapest live check: exactly one Gemini request
+```bash
+# Safest bounded evaluation: exactly 1 test case with a 15s delay
 python -m evals.evaluate_generation --max-cases 1 --delay-seconds 15 --stop-on-provider-error
 
-# Default small batch (3 cases)
+# Small batch (default 3 cases)
 python -m evals.evaluate_generation --max-cases 3 --delay-seconds 15
-
-# Full golden dataset (uses more quota — opt in explicitly)
-python -m evals.evaluate_generation --all --delay-seconds 15
 ```
 
-Before requests begin, the command prints cases, max external requests, timeout, and retry policy.
-
-The Gemini client uses a **60s HTTP timeout** and **disables SDK retries** (`HttpRetryOptions(attempts=1)`). By default google-genai would retry up to 5 times with backoff on 429, which can look like a hang and multiply quota usage.
-
-On 429/timeout the harness reports the failure and continues (or stops with `--stop-on-provider-error`). No automatic retries.
-
-### Current evaluation baseline
-
-Measured locally on Windows / Python 3.11.9 against the small golden dataset (`evals/golden_dataset.json`) and the sample knowledge document.
-
-**Retrieval evaluation (7 answerable cases, top-k = 4):**
-
-| Metric | Result |
-|--------|--------|
-| Hit Rate @4 | **100.0%** (7/7) |
-| MRR | **1.000** |
-
-How to read this:
-
-- This is a **baseline on a small controlled portfolio dataset**, not a production RAG benchmark.
-- These scores should **not** be interpreted as general RAG accuracy for arbitrary corpora or domains.
-- The retrieval baseline improved from 85.7% (6/7, MRR 0.857) to 100.0% (7/7, MRR 1.000) following a controlled chunking experiment (boundary-aware semantic chunking). See [Retrieval improvement experiment](#retrieval-improvement-experiment) below.
-- The golden dataset and retrieval top-k (4) were **not** changed.
-
-**Live generation evaluation:**
-
-- Opt-in and cost-conscious (manual command; limited `--max-cases`; no automatic retries).
-- A single successful live case was smoke-tested locally; that is **not** a generation-quality benchmark and must not be reported as “100% accuracy.”
-
-Automated pytest: **15 passed** in the same local environment. Dependency/deprecation warnings may appear and currently do not fail the suite.
-
-## Current status
-
-| Item | Status |
-|------|--------|
-| Indexing pipeline | Implemented |
-| Semantic retrieval | Implemented |
-| Gemini grounded `/ask` | Implemented |
-| Deterministic citations | Implemented |
-| Automated tests (pytest) | Implemented |
-| Golden dataset + retrieval eval | Implemented |
-| Optional generation eval | Implemented |
-| LLM-as-a-judge | **Not implemented** (deferred) |
-| Docker | Implemented (`backend/Dockerfile`) |
-| GitHub Actions CI | Implemented (`.github/workflows/ci.yml`) |
-| Observability | Implemented (structured JSON, request correlation, stage timing) |
-
-## Docker
-
-This project ships a **production-oriented** container for the FastAPI backend. It is reproducible local packaging — not a claim that the system is fully production-ready or cloud-deployed.
-
-### Build
-
-From the repository root (or from `backend/` with adjusted paths):
-
-```powershell
-cd C:\Users\arzug\production-rag-assistant\backend
-docker build -t production-rag-assistant:local .
-```
-
-Why `--reload` is not used in the image: reload is for local development (auto-restart on code changes). In a container you want a stable long-running process, clearer logs, and no extra file-watching overhead.
-
-### Persist Chroma data
-
-Do **not** bake `data/vector_store` into the image. Mount a named volume (or bind mount) so the index survives container replacement:
-
-| Concept | Meaning |
-|---------|---------|
-| Image | Immutable build artifact (code + dependencies) |
-| Container filesystem | Ephemeral runtime layer (lost when the container is removed) |
-| Volume | Persistent storage outside the container lifecycle |
-
-Example volume name: `rag_vector_store` → `/app/data/vector_store`
-
-### Index sample documents
-
-```powershell
-cd C:\Users\arzug\production-rag-assistant\backend
-docker run --rm `
-  -v rag_vector_store:/app/data/vector_store `
-  production-rag-assistant:local `
-  python -m app.ingestion.indexer --path data/documents
-```
-
-### Run API
-
-Inject secrets at runtime. Never bake `GEMINI_API_KEY` into the image.
-
-Use container-relative paths in `.env` if you set `VECTOR_DB_PATH` / `DOCUMENTS_PATH` (for example `data/vector_store`). Do not pass Windows absolute paths into the container.
-
-```powershell
-cd C:\Users\arzug\production-rag-assistant\backend
-docker run --rm -p 8000:8000 `
-  --env-file .env `
-  -v rag_vector_store:/app/data/vector_store `
-  production-rag-assistant:local
-```
-
-Optional: mount a Hugging Face cache volume so the Sentence Transformer model is not re-downloaded on every fresh container:
-
-`-v hf_cache:/root/.cache/huggingface`
-
-### Test health endpoint
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-```
+---
 
 ## Continuous Integration
 
-GitHub Actions workflow: `.github/workflows/ci.yml`
+GitHub Actions workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
-On pushes and pull requests to `main`, CI:
+On every push and pull request to `main`, CI executes:
+1. **Python 3.11 setup & dependency caching**
+2. **Deterministic test suite:** `python -m pytest -m "not slow"` (35 tests)
+3. **Application import validation:** verifies module dependencies and routes
+4. **Docker image build:** validates container buildability via Buildx
 
-1. Sets up **Python 3.11**
-2. Installs runtime + development dependencies
-3. Runs **fast** automated tests: `pytest -m "not slow"`
-4. Performs a lightweight import check
-5. Builds the Docker image (build-only; no push/deploy)
+CI does **not** require secrets, does **not** call Gemini, and does **not** perform cloud deployment. It validates code correctness and container reproducibility.
 
-CI intentionally does **not**:
-
-- require `GEMINI_API_KEY`
-- call Gemini
-- run `evals.evaluate_generation`
-- consume external LLM quota
-
-Why: normal CI should stay deterministic and cost-free from an LLM-API perspective. Live generation evaluation remains a **manual**, rate-limit-aware command for developers.
-
-Slow semantic/indexing tests (`@pytest.mark.slow`) stay valuable locally; excluding them from default CI avoids large model downloads on every push while keeping the PR feedback loop fast.
+---
 
 ## Observability
 
-This project implements lightweight, production-oriented observability using the Python standard library. It avoids heavy tracing dependencies, external daemons, or vendor lock-in.
+Lightweight, standard-library structured observability without external agents or vendor dependencies.
 
-### Key capabilities
+### Capabilities
+- **Structured JSON logging:** Formatted records stream to `stdout` with ISO-8601 UTC timestamps, log level, logger name, and event identifiers.
+- **Request correlation (`X-Request-ID`):** Incoming client request IDs are sanitized (`^[a-zA-Z0-9_\-\.]{1,128}$`) or auto-generated as UUID4, returned in HTTP response headers, and injected into all log entries during the request.
+- **Monotonic timing:** Measures stage latencies using `time.perf_counter()`, preventing timing distortions caused by NTP adjustments or system clock shifts.
+- **De-noised health checks:** Routine successful `/health` requests are logged at `DEBUG` level to prevent container log flooding, while degraded health responses are logged at `WARNING`/`ERROR`.
+- **Privacy-first policy:** Sensitive data is never logged. User questions, retrieved chunk text, generated answers, embeddings, and API keys are strictly excluded. Only safe metadata (lengths, counts, model names, durations, status codes) is emitted.
 
-- **Structured JSON logging:** Emits machine-readable single-line JSON logs to `stdout`/`stderr` for natural container capture (Docker, Kubernetes, cloud log routers).
-- **Request correlation (`X-Request-ID`):** Generates or reuses a sanitized request correlation ID for every incoming request. The ID is returned in the `X-Request-ID` HTTP response header and injected into all log events during the request lifecycle.
-- **Context-local propagation:** Uses `contextvars.ContextVar` to automatically propagate the request correlation ID across async tasks and worker threads without passing `request_id` through every function signature. Tokens are strictly reset in `finally` blocks to prevent state leakage.
-- **HTTP request completion logging:** Logs HTTP method, path, status code, duration, and request ID. Routine successful `/health` checks (200 OK) are logged at `DEBUG` level to prevent log flooding in container environments, while degraded health checks are surfaced at `WARNING`/`ERROR`.
-- **RAG stage timing:** Uses monotonic clocks (`time.perf_counter()`) to measure distinct pipeline stages:
-  - `rag_request_started`: captures question length and retrieval `top_k`.
-  - `retrieval_completed`: captures retrieval duration, chunks returned, top-k, and distinct source count.
-  - `generation_completed`: captures model name, generation duration, and citation count.
-  - `rag_request_completed`: captures end-to-end RAG request latency.
-- **Structured error logging:** Categorizes domain failures (`ConfigurationError`, `EmptyKnowledgeBaseError`, `NoRelevantContextError`, `RetrievalError`, `GenerationError`) without printing giant stack traces or sensitive external payload dumps.
+### Example Structured Log Events (Synthetic Data)
 
-### Privacy-conscious logging policy
-
-To safeguard user privacy and prevent credential/data leakage, the logging pipeline strictly enforces a zero-content-logging policy:
-- **NEVER logged:** `GEMINI_API_KEY`, Authorization headers, `.env` file contents, full user questions, retrieved document chunks, generated answer text, or embedding vectors.
-- **ONLY logged:** Safe diagnostic metadata such as string lengths, counts, durations in milliseconds, HTTP status codes, error categories, and correlation IDs.
-
-### Example structured log lines (synthetic values)
-
-Retrieval completion event:
 ```json
-{
-  "timestamp": "2026-09-12T09:30:15.123456Z",
-  "level": "INFO",
-  "logger": "app.rag",
-  "event": "retrieval_completed",
-  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
-  "top_k": 4,
-  "chunks_returned": 4,
-  "source_count": 1,
-  "duration_ms": 18.7
-}
+{"timestamp": "2026-09-12T09:30:15.123456Z", "level": "INFO", "logger": "app.rag", "event": "retrieval_completed", "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a", "top_k": 4, "chunks_returned": 4, "source_count": 1, "duration_ms": 18.72}
+{"timestamp": "2026-09-12T09:30:16.456789Z", "level": "INFO", "logger": "app.rag", "event": "generation_completed", "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a", "model": "gemini-3.6-flash", "citation_count": 2, "duration_ms": 612.41}
+{"timestamp": "2026-09-12T09:30:16.460123Z", "level": "INFO", "logger": "app.http", "event": "http_request_completed", "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a", "method": "POST", "path": "/ask", "status_code": 200, "duration_ms": 635.85}
 ```
 
-Generation completion event:
-```json
-{
-  "timestamp": "2026-09-12T09:30:16.456789Z",
-  "level": "INFO",
-  "logger": "app.rag",
-  "event": "generation_completed",
-  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
-  "model": "gemini-3.6-flash",
-  "citation_count": 2,
-  "duration_ms": 612.4
-}
+---
+
+## Project Structure
+
+```text
+production-rag-assistant/
+├── backend/
+│   ├── app/
+│   │   ├── core/           # Settings, exceptions, structured JSON logging & ContextVar
+│   │   ├── ingestion/      # Document loaders, boundary-aware chunking, indexing CLI
+│   │   ├── prompts/        # Grounded system instructions and context prompt builder
+│   │   ├── routers/        # FastAPI endpoints (/health, /ask)
+│   │   ├── schemas/        # Pydantic request/response validation schemas
+│   │   ├── services/       # Embeddings, vector store, retrieval, Gemini, RAG orchestration
+│   │   └── main.py         # Application entrypoint & request correlation middleware
+│   ├── data/
+│   │   ├── documents/      # Source knowledge documents (sample-rag-overview.md)
+│   │   └── vector_store/   # Persistent ChromaDB storage (local, gitignored)
+│   ├── evals/
+│   │   ├── experiments/    # Empirical experiment notes (chunking_experiment.md)
+│   │   ├── golden_dataset.json  # 11-case evaluation dataset (7 answerable, 4 unanswerable)
+│   │   ├── evaluate_retrieval.py   # Offline Hit Rate@K & MRR harness
+│   │   └── evaluate_generation.py  # Optional bounded live generation evaluation
+│   ├── tests/              # 37 automated tests (unit, integration, deterministic mocks)
+│   ├── Dockerfile          # Reproducible container image (Python 3.11-slim)
+│   ├── requirements.txt    # Production runtime dependencies
+│   └── requirements-dev.txt# Testing dependencies (pytest, httpx)
+├── docs/                   # Developer guides (local setup, dependency rationale)
+├── notes/                  # Chronological engineering progression notes
+├── .github/workflows/      # GitHub Actions CI workflow (ci.yml)
+└── README.md
 ```
 
-HTTP request completion event:
-```json
-{
-  "timestamp": "2026-09-12T09:30:16.460123Z",
-  "level": "INFO",
-  "logger": "app.http",
-  "event": "http_request_completed",
-  "request_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
-  "method": "POST",
-  "path": "/ask",
-  "status_code": 200,
-  "duration_ms": 635.8
-}
-```
+---
 
-## Retrieval improvement experiment
+## Scope & Limitations
 
-A controlled retrieval evaluation experiment was conducted in Commit 8 following an empirical engineering cycle (Measure → Diagnose → Hypothesize → Single Variable Change → Re-index → Re-evaluate → Decide).
+This project is an applied AI engineering milestone with deliberate scope boundaries:
+- **Small evaluation corpus:** The current golden dataset evaluates 11 cases on one sample document. It demonstrates evaluation methodology, not universal accuracy.
+- **Single-node embedded vector database:** Chroma runs embedded with SQLite/HNSW. It is suited for single-instance or volume-mounted setups, not distributed vector clusters.
+- **No authentication / authorization:** The API does not implement API key verification or OAuth; it is intended to sit behind an API gateway in real production deployments.
+- **No reranking or hybrid search:** Retrieval relies on bi-encoder cosine similarity. Hybrid BM25 retrieval and cross-encoder reranking are natural next steps.
+- **No distributed tracing backend:** Request correlation uses `X-Request-ID` and JSON logs. OpenTelemetry spans and collector export are deferred.
+- **Docker image size:** The image is approximately 9-10 GB uncompressed due to PyTorch and sentence-transformer dependencies on Python 3.11-slim.
+- **Cold start latency:** The first embedding request after startup incurs a 2-3 second model initialization delay on CPU.
+- **External LLM dependency:** Grounded answer generation relies on Google Gemini availability and rate limits.
 
-### Baseline
-- **Hit Rate @ 4:** 85.7% (6/7)
-- **MRR:** 0.857
-- **Failed case:** `ans-006` ("How does POST /ask use retrieved chunks in this project?")
+---
 
-### Observation
-In the original character-based windowing strategy, Chunk 3 ended mid-sentence and Chunk 4 started mid-word at character index 1600 (`"om retrieval metadata..."`). The query asked about `POST /ask`, but the target evidence was severed across window boundaries, ranking Chunk 3 at position 5 (outside top-4) and leaving Chunk 4 with an incomplete fragmented sentence.
+## Future Work
 
-### Hypothesis
-If chunking respects paragraph and sentence boundaries while keeping the target chunk size (`CHUNK_SIZE=500`) and overlap (`CHUNK_OVERLAP=100`) constant, the relevant evidence for `ans-006` will remain intact within a coherent semantic chunk, ranking within top-4 without regressing retrieval on any other answerable question in the golden dataset.
+- **Multi-document evaluation corpus:** Expand golden datasets across complex document layouts, tables, and varied domains.
+- **Hybrid retrieval & reranking:** Benchmark BM25 + dense retrieval with a cross-encoder reranker (e.g., `bge-reranker-base`).
+- **CPU optimization:** Export embeddings to ONNX Runtime / int8 quantization to reduce Docker image size and inference latency.
+- **OpenTelemetry integration:** Export OTLP trace spans from the existing stage timers to Jaeger or Grafana Tempo.
+- **Cloud vector store migration:** Support external managed vector databases (e.g., Pinecone, Qdrant, pgvector).
 
-### Experiment
-- **Single variable changed:** Boundary-aware semantic chunking in `backend/app/ingestion/chunking.py`. Rather than blindly cutting at fixed character counts, the chunker finds the nearest natural boundary (paragraphs `\n\n`, lines `\n`, sentence endings `. `, or word breaks ` `) before `chunk_size` and locates clean token starts for overlap.
-- **Variables held constant:** `evals/golden_dataset.json` (unchanged), `RETRIEVAL_TOP_K=4` (unchanged), Sentence Transformers embedding model (unchanged), sample corpus (unchanged).
-- **Clean re-indexing:** Implemented `indexer.py --clean` and `VectorStore.clear()` to prevent stale chunk residue from previous chunking schemas.
+*Note: Multi-agent orchestration, LangGraph, and Model Context Protocol (MCP) will be explored in dedicated separate repositories to maintain this codebase as a focused, modular RAG reference.*
 
-### Result
+---
 
-| Metric | Baseline | Candidate | Delta |
-|---|---|---|---|
-| Hit Rate @ 4 | 85.7% (6/7) | **100.0% (7/7)** | **+14.3%** |
-| MRR | 0.857 | **1.000** | **+0.143** |
-| Failed answerable cases | 1 (`ans-006`) | **0** | **-1** |
-| `ans-006` Rank | Rank 5 | **Rank 1** | **+4 ranks** |
-| Other cases (`ans-001`..`005`, `007`) | Rank 1 | **Rank 1** | **Stable** |
+## Repository Status
 
-### Decision
-**KEEP.** The change directly solved the boundary fragmentation problem without adding external framework bloat or altering top-k. While 100% on a 7-case golden set is a welcome result for this controlled portfolio corpus, it is a local baseline improvement and does not prove universal accuracy across arbitrary unseen documents. Detailed notes are recorded in [`backend/evals/experiments/chunking_experiment.md`](backend/evals/experiments/chunking_experiment.md).
+**Portfolio Milestone Complete.**
 
-## Documentation
+The core production-oriented RAG lifecycle—ingestion, boundary-aware chunking, vector indexing, retrieval, grounded generation, automated testing, empirical evaluation, containerisation, CI, and observability—is verified and complete. Future updates will focus on maintenance, dependency updates, and evidence-driven experiments.
 
-- [`docs/local-development.md`](docs/local-development.md)
-- [`docs/backend-dependencies.md`](docs/backend-dependencies.md)
-- [`backend/.env.example`](backend/.env.example)
-- [`backend/Dockerfile`](backend/Dockerfile)
-- [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-- Learning notes under [`notes/`](notes/)
+---
 
-Supported local runtime: **Python 3.11** (especially on Windows, for Chroma wheels).
+## Documentation Links
+
+- [Local Development Guide](docs/local-development.md)
+- [Backend Dependency Rationale](docs/backend-dependencies.md)
+- [Retrieval Experiment: Boundary-Aware Chunking](backend/evals/experiments/chunking_experiment.md)
+- [Docker Configuration](backend/Dockerfile)
+- [CI Workflow](.github/workflows/ci.yml)

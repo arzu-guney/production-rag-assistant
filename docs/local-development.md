@@ -78,10 +78,10 @@ Never commit `.env`.
 ### 5. Index the sample document
 
 ```powershell
-python -m app.ingestion.indexer --path data/documents
+python -m app.ingestion.indexer --path data/documents --clean
 ```
 
-Expected: only `sample-rag-overview.md` is loaded (about 5 chunks). Re-running should keep collection size stable.
+Expected: only `sample-rag-overview.md` is loaded (about 6 boundary-aware chunks). Re-running should keep collection size stable.
 
 ### 6. Run the API
 
