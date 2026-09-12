@@ -204,16 +204,15 @@ Measured locally on Windows / Python 3.11.9 against the small golden dataset (`e
 
 | Metric | Result |
 |--------|--------|
-| Hit Rate @4 | **85.7%** (6/7) |
-| MRR | **0.857** |
+| Hit Rate @4 | **100.0%** (7/7) |
+| MRR | **1.000** |
 
 How to read this:
 
 - This is a **baseline on a small controlled portfolio dataset**, not a production RAG benchmark.
 - These scores should **not** be interpreted as general RAG accuracy for arbitrary corpora or domains.
-- One retrieval failure is intentionally preserved for analysis: **`ans-006`** (“How does POST /ask use retrieved chunks in this project?”).
-- The golden dataset and retrieval settings were **not** changed just to raise the score.
-- Improving that miss (for example via chunking or retrieval experiments) is a **future** improvement area.
+- The retrieval baseline improved from 85.7% (6/7, MRR 0.857) to 100.0% (7/7, MRR 1.000) following a controlled chunking experiment (boundary-aware semantic chunking). See [Retrieval improvement experiment](#retrieval-improvement-experiment) below.
+- The golden dataset and retrieval top-k (4) were **not** changed.
 
 **Live generation evaluation:**
 
@@ -390,6 +389,39 @@ HTTP request completion event:
   "duration_ms": 635.8
 }
 ```
+
+## Retrieval improvement experiment
+
+A controlled retrieval evaluation experiment was conducted in Commit 8 following an empirical engineering cycle (Measure → Diagnose → Hypothesize → Single Variable Change → Re-index → Re-evaluate → Decide).
+
+### Baseline
+- **Hit Rate @ 4:** 85.7% (6/7)
+- **MRR:** 0.857
+- **Failed case:** `ans-006` ("How does POST /ask use retrieved chunks in this project?")
+
+### Observation
+In the original character-based windowing strategy, Chunk 3 ended mid-sentence and Chunk 4 started mid-word at character index 1600 (`"om retrieval metadata..."`). The query asked about `POST /ask`, but the target evidence was severed across window boundaries, ranking Chunk 3 at position 5 (outside top-4) and leaving Chunk 4 with an incomplete fragmented sentence.
+
+### Hypothesis
+If chunking respects paragraph and sentence boundaries while keeping the target chunk size (`CHUNK_SIZE=500`) and overlap (`CHUNK_OVERLAP=100`) constant, the relevant evidence for `ans-006` will remain intact within a coherent semantic chunk, ranking within top-4 without regressing retrieval on any other answerable question in the golden dataset.
+
+### Experiment
+- **Single variable changed:** Boundary-aware semantic chunking in `backend/app/ingestion/chunking.py`. Rather than blindly cutting at fixed character counts, the chunker finds the nearest natural boundary (paragraphs `\n\n`, lines `\n`, sentence endings `. `, or word breaks ` `) before `chunk_size` and locates clean token starts for overlap.
+- **Variables held constant:** `evals/golden_dataset.json` (unchanged), `RETRIEVAL_TOP_K=4` (unchanged), Sentence Transformers embedding model (unchanged), sample corpus (unchanged).
+- **Clean re-indexing:** Implemented `indexer.py --clean` and `VectorStore.clear()` to prevent stale chunk residue from previous chunking schemas.
+
+### Result
+
+| Metric | Baseline | Candidate | Delta |
+|---|---|---|---|
+| Hit Rate @ 4 | 85.7% (6/7) | **100.0% (7/7)** | **+14.3%** |
+| MRR | 0.857 | **1.000** | **+0.143** |
+| Failed answerable cases | 1 (`ans-006`) | **0** | **-1** |
+| `ans-006` Rank | Rank 5 | **Rank 1** | **+4 ranks** |
+| Other cases (`ans-001`..`005`, `007`) | Rank 1 | **Rank 1** | **Stable** |
+
+### Decision
+**KEEP.** The change directly solved the boundary fragmentation problem without adding external framework bloat or altering top-k. While 100% on a 7-case golden set is a welcome result for this controlled portfolio corpus, it is a local baseline improvement and does not prove universal accuracy across arbitrary unseen documents. Detailed notes are recorded in [`backend/evals/experiments/chunking_experiment.md`](backend/evals/experiments/chunking_experiment.md).
 
 ## Documentation
 

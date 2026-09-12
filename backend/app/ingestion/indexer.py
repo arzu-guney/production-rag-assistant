@@ -45,7 +45,12 @@ class IndexingSummary:
         print("========================\n")
 
 
-def index_documents(path: Path, settings: Settings | None = None) -> IndexingSummary:
+def index_documents(
+    path: Path,
+    settings: Settings | None = None,
+    *,
+    clean: bool = False,
+) -> IndexingSummary:
     """Load → chunk → embed → upsert into the persistent vector store."""
     settings = settings or get_settings()
     summary = IndexingSummary()
@@ -75,6 +80,12 @@ def index_documents(path: Path, settings: Settings | None = None) -> IndexingSum
             persist_path=settings.vector_db_path,
             collection_name=settings.collection_name,
         )
+        if clean:
+            vector_store.clear()
+            print(
+                f"Cleared existing collection '{settings.collection_name}' "
+                f"at {settings.vector_db_path} before indexing."
+            )
     except Exception as exc:  # noqa: BLE001
         summary.errors.append(f"Failed to initialise embedding/vector services: {exc}")
         return summary
@@ -147,6 +158,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Directory of documents (.txt, .md, .pdf). Defaults to DOCUMENTS_PATH.",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clear existing vector collection before indexing to prevent stale chunks.",
+    )
     return parser
 
 
@@ -166,8 +182,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"Vector DB path: {settings.vector_db_path}")
     print(f"Collection: {settings.collection_name}")
+    if args.clean:
+        print("Mode: clean re-index (clearing collection first)")
 
-    summary = index_documents(path, settings=settings)
+    summary = index_documents(path, settings=settings, clean=args.clean)
     summary.print_report()
 
     if summary.errors and summary.chunks_indexed == 0:

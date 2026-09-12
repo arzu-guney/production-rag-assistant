@@ -47,6 +47,17 @@ class VectorStore:
     def count(self) -> int:
         return int(self._collection.count())
 
+    def clear(self) -> None:
+        """Remove all chunks from the collection to avoid stale chunk residue."""
+        try:
+            self._client.delete_collection(name=self.collection_name)
+        except Exception:
+            pass
+        self._collection = self._client.get_or_create_collection(
+            name=self.collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+
     def query(
         self,
         *,
