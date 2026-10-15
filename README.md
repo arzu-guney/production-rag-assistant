@@ -2,7 +2,7 @@
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![CI](https://github.com/arzucaner/production-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/arzucaner/production-rag-assistant/actions/workflows/ci.yml)
+[![CI](https://github.com/arzu-guney/production-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/arzu-guney/production-rag-assistant/actions/workflows/ci.yml)
 
 A production-oriented Retrieval-Augmented Generation (RAG) backend built with Python 3.11, FastAPI, local Sentence Transformers, persistent ChromaDB, and Google Gemini.
 
@@ -115,7 +115,7 @@ Prerequisites: **Python 3.11** (recommended for prebuilt Chroma binary wheels) a
 
 ```bash
 # 1. Clone repository and navigate to backend
-git clone https://github.com/arzucaner/production-rag-assistant.git
+git clone https://github.com/arzu-guney/production-rag-assistant.git
 cd production-rag-assistant/backend
 
 # 2. Create and activate a virtual environment
